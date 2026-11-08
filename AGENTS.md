@@ -64,3 +64,7 @@ Dieses Dokument gilt für **jede** Änderung an Smartify Energy Row (SER), einsc
 - Bei Tests auf GitHub: immer letzten Commit-SHA kontrollieren, nicht auf Ergebnisse eines älteren Commits verlassen.
 - `README.md`/HACS-Hinweise und Beispiele bei Features aktualisieren. Bekannte Einschränkungen nicht als fertig darstellen.
 - Vor dem Fertigmelden echten GitHub-Stand (Commit/PR/Release-Tag) prüfen und über ungeprüfte Bereiche transparent informieren.
+
+## Sections-Dashboards: Pflichtfall für Link- und Importtests
+- Die Suche muss `views[].sections[].cards[]` ebenso wie klassische `views[].cards[]`, verschachtelte Stacks und Wrapper-Karten berücksichtigen. Beispielpfad `/dashboard-energiemanager/s-f-c`: Dashboard-Schlüssel `dashboard-energiemanager`, View `s-f-c` ist **keine** Kartenindex- oder Dashboard-Eingabe.
+- Tests müssen eine Flow Card auf der zweiten Ansicht unter Sections finden und den Dashboard-Pfad `lovelace/config` exakt prüfen. Fehlerdiagnosen sollen den geprüften Pfad nennen.
