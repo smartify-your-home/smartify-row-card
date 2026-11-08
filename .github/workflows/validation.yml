@@ -1,4 +1,4 @@
-name: Validate Smartify Row
+name: Validate & Release Smartify Energy Row Card
 on:
   push:
     branches: [main]
@@ -29,3 +29,45 @@ jobs:
         run: python -m compileall -q custom_components tests/test_repository.py
       - name: Integration metadata, translations and secret checks
         run: python -m unittest discover -s tests -p 'test_*.py' -v
+
+  release:
+    name: Publish GitHub Release
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read and validate semantic version
+        id: version
+        shell: bash
+        run: |
+          VERSION="$(python3 -c 'import json; print(json.load(open("custom_components/smartify_energy_row_card/manifest.json"))["version"])')"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid manifest version: $VERSION" >&2
+            exit 1
+          fi
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Publish versioned release if missing
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "GitHub release $TAG already exists; no duplicate publication."
+            exit 0
+          fi
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -q .; then
+            echo "Tag $TAG exists without a release; refusing to silently retarget it." >&2
+            exit 1
+          fi
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "Smartify Energy Row Card $VERSION" \
+            --notes-file RELEASE_NOTES.md \
+            --latest
