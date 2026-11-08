@@ -2,7 +2,7 @@
  * smartify-energy-row-card
  * Lovelace Custom Card — alle Energiewerte in einer Zeile.
  * Config zentral via HA Websocket gespeichert (geräteübergreifend, kein Token nötig).
- * Version: 2.0.1 (standalone integration)
+ * Version: 2.0.2 (standalone integration)
  *
  * Speicherung: eigener Home-Assistant-Store via authentifizierte WebSocket-Endpunkte
  *
@@ -75,14 +75,14 @@ function resolveFlowSlots(hass,c) {
     .map(p=>p?.power).filter(Boolean);
   const grid=c.grid||{},b=c.battery||{};
   const slots=[
-    {id:"pv",label:c.solar?.name||"PV",icon:c.solar?.icon||"mdi:solar-power",entities:[...new Set(pv)],mode:"pv",show_name:true,hide_below:0},
-    {id:"home",label:"Hausverbrauch",icon:"mdi:home",mode:"home",show_name:true,hide_below:0},
+    {id:"pv",label:c.solar?.name||"PV",icon:c.solar?.icon||"mdi:solar-power",entities:[...new Set(pv)],mode:"pv",show_name:true,hide_below:0,gradient:["#ff9900","#ffc34d"]},
+    {id:"home",label:"Hausverbrauch",icon:"mdi:home",mode:"home",show_name:true,hide_below:0,gradient:["#555","#111"]},
     {id:"grid",label:grid.name||"Netz",icon:"mdi:transmission-tower",mode:"flow_grid",
      entity:grid.saldo_power||grid.import_power||"",entity_secondary:grid.export_power||"",
      grid_mode:grid.mode||(grid.saldo_power?"saldo":"separate"),positive_import:grid.positive_import!==false,
-     show_name:true,hide_below:0},
+     show_name:true,hide_below:0,gradient_import:["#FFB74D","#E65100"],gradient_export:["#81C784","#00ACC1"]},
   ];
-  if(b.power)slots.push({id:"battery",label:b.name||"Akku",icon:b.icon||"mdi:battery",mode:"battery",entity:b.power,invert:!!b.invert,show_name:true,hide_below:0});
+  if(b.power)slots.push({id:"battery",label:b.name||"Akku",icon:b.icon||"mdi:battery",mode:"battery",entity:b.power,invert:!!b.invert,show_name:true,hide_below:0,gradient:["#22a06b","#38bdf8"]});
   const explicit=Object.keys(c.consumers||{}).filter(id=>id.startsWith("sensor."));
   const labels=hass?.labels||{};const wanted=String(c.label||"verbraucher").toLowerCase();
   const valid=new Set([wanted]);
@@ -101,7 +101,7 @@ function resolveFlowSlots(hass,c) {
     const friendly=hass?.states?.[id]?.attributes?.friendly_name||id;
     const label=ov.name||friendly.replace(/\s+(Leistung|Power Total|current power|power)$/i,"");
     slots.push({id,entity:id,label,icon:ov.icon||hass?.entities?.[id]?.icon||hass?.states?.[id]?.attributes?.icon||"mdi:power-plug",
-      show_name:true,hide_below:0,color_text:ov.color||undefined});
+      show_name:true,hide_below:0,accent_color:ov.color||undefined});
   }
   return slots;
 }
@@ -199,7 +199,29 @@ function getDisplayValue(hass, slot, measure) {
   return displayPower(slotPower(hass,slot));
 }
 
+function safeAccent(color, fallback) {
+  return typeof color==="string" && /^#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?$/.test(color.trim()) ? color.trim() : fallback;
+}
+function slotAccent(hass, slot, measurements) {
+  if(slot.accent_color) return safeAccent(slot.accent_color, "#64748b");
+  const w=slotPower(hass,slot,measurements);
+  switch(slot.mode||slot.id){
+    case "pv": return "#f5b301";
+    case "home": return "#64748b";
+    case "flow_grid": case "grid":
+      return w===null ? "#94a3b8" : w>0 ? "#f97316" : w<0 ? "#00a896" : "#94a3b8";
+    case "battery":
+      return w===null ? "#94a3b8" : w>0 ? "#22a06b" : w<0 ? "#38bdf8" : "#94a3b8";
+    case "heatpump":
+      return w===null ? "#94a3b8" : w>2000 ? "#ef4444" : w>1000 ? "#f59e0b" : "#38bdf8";
+    case "ohmpilot": return "#0288d1";
+    case "charger": return "#00acc1";
+    default: return safeAccent(slot.color||slot.color_text, "#64748b");
+  }
+}
+
 function getBackground(hass, slot, measure) {
+  if(slot.mode==="battery") return slotPower(hass,slot,measure)<0 ? "linear-gradient(135deg,#38bdf8,#0288d1)" : "linear-gradient(135deg,#22a06b,#86efac)";
   if(slot.mode==="flow_grid"){
     const w=slotPower(hass,slot,measure);
     const grad=w!=null&&w>0?slot.gradient_import:w!=null&&w<0?slot.gradient_export:null;
@@ -413,6 +435,9 @@ class SmartifyEnergyRowCardEditor extends HTMLElement {
           <input type="checkbox" data-field="show_name" id="sn_${slot.id}" ${slot.show_name ? "checked" : ""}>
           <label for="sn_${slot.id}" style="margin:0;font-size:13px">Name anzeigen</label>
         </div>
+
+        <label>Farbmarkierung (Hex, optional)</label>
+        <input type="text" data-field="accent_color" value="${esc(slot.accent_color||"")}" placeholder="#f5b301">
 
         <label>Textfarbe</label>
         <div class="color-row">
@@ -672,6 +697,7 @@ class SmartifyEnergyRowCard extends HTMLElement {
 
     const slotsHTML = visible.map(slot => {
       const bg      = getBackground(h, slot,measurements);
+      const accent  = slotAccent(h,slot,measurements);
       const display = getDisplayValue(h, slot,measurements);
       const overlay = getBoilerOverlay(h, slot);
       const iconOff = overlay !== "";
@@ -679,7 +705,7 @@ class SmartifyEnergyRowCard extends HTMLElement {
                       ? "scaleX(-1)" : "scaleX(1)";
       return `
         <div class="slot" data-id="${slot.id}"
-             style="--row-gradient:${bg};height:${height}px;">
+             style="--row-gradient:${bg};--row-accent:${accent};height:${height}px;">
           <div class="icon-wrap">
             <ha-icon icon="${esc(slot.icon)}"
               style="color:${iconOff?"transparent":"currentColor"};transform:${flip}"></ha-icon>
@@ -694,7 +720,7 @@ class SmartifyEnergyRowCard extends HTMLElement {
       <style>
         :host {display:block;font-family:var(--primary-font-family,inherit);color:var(--primary-text-color);}
         ha-card{padding:0;border-radius:var(--ha-card-border-radius,12px);background:transparent;box-shadow:none;border:none;}
-        .slot{color:var(--primary-text-color);border:1px solid var(--ha-card-border-color,var(--divider-color));background:transparent!important;}
+        .slot{color:var(--primary-text-color);border:1px solid var(--ha-card-border-color,var(--divider-color));border-top:4px solid var(--row-accent);background:transparent!important;}
         .slot:before{content:"";position:absolute;inset:0;pointer-events:none;
           background:${c.theme_style==="gradient"?"var(--row-gradient,var(--ha-card-background,var(--card-background-color,#fff)))":"var(--ha-card-background,var(--card-background-color,#fff))"};
           opacity:${Math.max(0,Math.min(1,1-(Number(c.background_transparency)||0)/100))};}
