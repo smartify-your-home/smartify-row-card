@@ -15,7 +15,7 @@ const context=vm.createContext({
   HTMLElement:Element,
   customElements:{get:k=>registry.get(k),define:(k,v)=>registry.set(k,v)},
   window:{customCards:[],addEventListener(){},removeEventListener(){}},
-  console,Event:class {},requestAnimationFrame(){},
+  console,URL,Event:class {},requestAnimationFrame(){},
 });
 vm.runInContext(src+`
   globalThis.testApi={finitePower,resolveFlowSlots,flowMeasurements,slotPower,displayPower,loadFlowConfig,mergeSlots,isVisible,esc};`,context);
@@ -159,4 +159,43 @@ test('Nested horizontal/vertical stack and wrapped cards are found in order',asy
 test('No match in Sections yields a contextual dashboard-path error',async()=>{
   const h={connection:{sendMessagePromise:async()=>({views:[{sections:[{cards:[{type:'entities'}]}]}]})}};
   await assert.rejects(()=>api.loadFlowConfig(h,'dashboard-energiemanager',1),/dashboard-energiemanager/);
+});
+
+test('Full dashboard URL scopes search to second view, rather than all views',async()=>{
+ let payload;
+ const h={connection:{sendMessagePromise:async p=>{
+  payload=p;
+  return {views:[
+   {path:'overview',cards:[{type:'custom:smartify-flow-card',title:'Overview',solar:{},grid:{}}]},
+   {path:'s-f-c',sections:[{cards:[{type:'custom:smartify-flow-card',title:'SFC',solar:{power:'sensor.pv'},grid:{}}]}]}
+  ]};
+ }}};
+ const cfg=await api.loadFlowConfig(h,'https://example.test/dashboard-energiemanager/s-f-c',1);
+ assert.equal(payload.url_path,'dashboard-energiemanager');
+ assert.equal(cfg.title,'SFC');
+});
+test('Exact view path /dashboard-energiemanager/s-f-c selects one card',async()=>{
+ const h={connection:{sendMessagePromise:async()=>({views:[
+  {path:'overview',cards:[{type:'custom:smartify-flow-card',title:'Other',solar:{},grid:{}}]},
+  {path:'s-f-c',sections:[{cards:[{type:'custom:smartify-flow-card',title:'Target',solar:{},grid:{}}]}]}
+ ]})}};
+ assert.equal((await api.loadFlowConfig(h,'/dashboard-energiemanager/s-f-c',1)).title,'Target');
+});
+test('Websocket errors are surfaced with path and original error code',async()=>{
+ const h={connection:{sendMessagePromise:async()=>{throw {code:'not_found',message:'Dashboard missing'};}}};
+ await assert.rejects(()=>api.loadFlowConfig(h,'dashboard-energiemanager',1),/not_found.*Dashboard missing/);
+});
+test('setConfig with existing hass initiates linked dashboard refresh',async()=>{
+ const Card=registry.get('smartify-energy-row-card');
+ const card=new Card();
+ const messages=[];
+ card._hass={connection:{sendMessagePromise:async msg=>{
+   messages.push(msg);
+   if(msg.type==='lovelace/config')return {views:[{cards:[{type:'custom:smartify-flow-card',solar:{power:'sensor.pv'},grid:{}}]}]};
+   return {slots:[]};
+ }},states:{},entities:{},labels:{}};
+ card.setConfig({source_mode:'linked',flow_dashboard:'dashboard-energiemanager',flow_index:1});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.ok(messages.some(m=>m.type==='lovelace/config'&&m.url_path==='dashboard-energiemanager'));
+ assert.ok(card._flowConfig);
 });
