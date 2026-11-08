@@ -1,7 +1,7 @@
 {
   "domain": "smartify_energy_row_card",
   "name": "Smartify Energy Row Card",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "documentation": "https://github.com/smartify-your-home/smartify-row-card",
   "issue_tracker": "https://github.com/smartify-your-home/smartify-row-card/issues",
   "codeowners": [
