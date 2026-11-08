@@ -1,0 +1,24 @@
+name: Validate Smartify Row
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: JavaScript syntax
+        run: node --check custom_components/smartify_energy_row/frontend/smartify-energy-row.js
+      - name: JavaScript behavior
+        run: node --test tests/row-card.test.cjs
+      - name: Python syntax
+        run: python -m compileall -q custom_components
+      - name: Verify no bundled token
+        run: '! grep -RE "eyJhbGciOiJIUzI1Ni" custom_components README.md'
