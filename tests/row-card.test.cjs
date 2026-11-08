@@ -128,3 +128,35 @@ test('UI offers all data sources, transparency, font sizes and theme handling',(
   assert.match(src,/slot:before/);
   assert.doesNotMatch(src,/haCard\.style\.setProperty\("background"/);
 });
+
+test('Flow Card on second dashboard view inside Sections is found',async()=>{
+  let sent;
+  const h={connection:{sendMessagePromise:async q=>{
+    sent=q;
+    return {views:[
+      {title:'Übersicht',path:'home',sections:[{cards:[{type:'entities'}]}]},
+      {title:'SFC',path:'s-f-c',sections:[{type:'grid',cards:[
+        {type:'heading',heading:'Energie'},
+        {type:'custom:smartify-flow-card',solar:{power:'sensor.pv'},grid:{mode:'saldo',saldo_power:'sensor.saldo'}}
+      ]}]}
+    ]};
+  }}};
+  const flow=await api.loadFlowConfig(h,'dashboard-energiemanager',1);
+  assert.equal(sent.url_path,'dashboard-energiemanager');
+  assert.equal(flow.solar.power,'sensor.pv');
+});
+
+test('Nested horizontal/vertical stack and wrapped cards are found in order',async()=>{
+  const h={connection:{sendMessagePromise:async()=>({
+    views:[{sections:[{cards:[{type:'vertical-stack',cards:[
+      {type:'horizontal-stack',cards:[{type:'custom:smartify-flow-card',title:'First',solar:{},grid:{}}]},
+      {type:'custom:mod-card',card:{type:'custom:smartify-flow-card',title:'Second',solar:{},grid:{}}}
+    ]}]}]}]
+  })}};
+  assert.equal((await api.loadFlowConfig(h,'dashboard-energiemanager',2)).title,'Second');
+});
+
+test('No match in Sections yields a contextual dashboard-path error',async()=>{
+  const h={connection:{sendMessagePromise:async()=>({views:[{sections:[{cards:[{type:'entities'}]}]}]})}};
+  await assert.rejects(()=>api.loadFlowConfig(h,'dashboard-energiemanager',1),/dashboard-energiemanager/);
+});
