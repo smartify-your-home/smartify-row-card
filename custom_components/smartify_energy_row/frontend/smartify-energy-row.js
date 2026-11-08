@@ -29,15 +29,21 @@ async function loadFlowConfig(hass,dashboard,index) {
   if(path&&path!=="lovelace")payload.url_path=path;
   const cfg=await hass.connection.sendMessagePromise(payload);
   const cards=[];
+  // HA's Sections dashboard nests cards in views[].sections[].cards[].
+  // Also support vertical/horizontal/grid stacks and nested card wrappers.
+  const visited=new WeakSet();
   const visit=(node)=>{
-    if(!node||typeof node!=="object")return;
-    if(node.type==="custom:smartify-flow-card")cards.push(node);
-    for(const key of ["views","cards","elements"])if(Array.isArray(node[key]))node[key].forEach(visit);
-    if(node.card)visit(node.card);
+    if(!node||typeof node!=="object"||visited.has(node))return;
+    visited.add(node);
+    if(Array.isArray(node)){node.forEach(visit);return;}
+    if(node.type==="custom:smartify-flow-card"){cards.push(node);return;}
+    for(const key of ["views","sections","cards","elements","columns","rows","card","config"]){
+      if(node[key]&&typeof node[key]==="object")visit(node[key]);
+    }
   };
   visit(cfg);
   const at=Math.max(0,(Number(index)||1)-1);
-  if(!cards.length)throw Error("Keine Smartify Flow Card im ausgewählten Dashboard gefunden");
+  if(!cards.length)throw Error("Keine Smartify Flow Card im Dashboard „"+(path||"lovelace")+"“ gefunden (auch Sections durchsucht). Prüfe Dashboard-Pfad und Kartenart.");
   if(!cards[at])throw Error("Flow Card Nummer "+(at+1)+" nicht vorhanden ("+cards.length+" gefunden)");
   return cards[at];
 }
