@@ -2,7 +2,7 @@
  * smartify-energy-row-card
  * Lovelace Custom Card — alle Energiewerte in einer Zeile.
  * Config zentral via HA Websocket gespeichert (geräteübergreifend, kein Token nötig).
- * Version: 2.0.0 (standalone integration)
+ * Version: 2.0.1 (standalone integration)
  *
  * Speicherung: eigener Home-Assistant-Store via authentifizierte WebSocket-Endpunkte
  *
@@ -22,14 +22,15 @@ async function wsSet(conn,data) {
   try { await conn.sendMessagePromise({type:"smartify_energy_row_card/save",slots:data.slots}); return true; }
   catch (e) { console.error("Smartify Row settings could not be saved",e); return false; }
 }
-async function loadFlowConfig(hass,dashboard,index) {
-  const path=String(dashboard||"lovelace").replace(/^\/+|\/+$/g,"");
-  const payload={type:"lovelace/config"};
-  if(path&&path!=="lovelace")payload.url_path=path;
-  const cfg=await hass.connection.sendMessagePromise(payload);
+function normalizeFlowLocation(dashboard) {
+  // Accept dashboard keys, HA dashboard/view routes and pasted absolute URLs.
+  let value=String(dashboard||"lovelace").trim();
+  if(/^https?:\/\//i.test(value)){try{value=new URL(value).pathname;}catch{throw Error("Ungültige Dashboard-URL");}}
+  const parts=value.split("/").filter(Boolean);
+  return {dashboard:parts[0]||"lovelace",view:parts[1]||""};
+}
+function findFlowCards(cfg,viewPath=""){
   const cards=[];
-  // HA's Sections dashboard nests cards in views[].sections[].cards[].
-  // Also support vertical/horizontal/grid stacks and nested card wrappers.
   const visited=new WeakSet();
   const visit=(node)=>{
     if(!node||typeof node!=="object"||visited.has(node))return;
@@ -40,10 +41,27 @@ async function loadFlowConfig(hass,dashboard,index) {
       if(node[key]&&typeof node[key]==="object")visit(node[key]);
     }
   };
-  visit(cfg);
+  if(viewPath&&Array.isArray(cfg?.views)){
+    const selected=cfg.views.find((view,i)=>String(view.path||i)===viewPath);
+    if(!selected)throw Error("Die Dashboard-Ansicht „"+viewPath+"“ existiert nicht. Verfügbare Ansichten: "+cfg.views.map((v,i)=>v.path||i).join(", "));
+    visit(selected);
+  }else visit(cfg);
+  return cards;
+}
+async function loadFlowConfig(hass,dashboard,index){
+  if(!hass?.connection?.sendMessagePromise)throw Error("Keine Home-Assistant-WebSocket-Verbindung");
+  const location=normalizeFlowLocation(dashboard);
+  const payload={type:"lovelace/config",url_path:location.dashboard};
+  let cfg;
+  try{cfg=await hass.connection.sendMessagePromise(payload);}
+  catch(err){
+    const code=err?.code||"websocket_error";
+    throw Error("Dashboard „"+location.dashboard+"“ konnte nicht geladen werden ["+code+"]: "+(err?.message||String(err)));
+  }
+  const cards=findFlowCards(cfg,location.view);
   const at=Math.max(0,(Number(index)||1)-1);
-  if(!cards.length)throw Error("Keine Smartify Flow Card im Dashboard „"+(path||"lovelace")+"“ gefunden (auch Sections durchsucht). Prüfe Dashboard-Pfad und Kartenart.");
-  if(!cards[at])throw Error("Flow Card Nummer "+(at+1)+" nicht vorhanden ("+cards.length+" gefunden)");
+  if(!cards.length)throw Error("Keine Smartify Flow Card unter „"+location.dashboard+(location.view?"/"+location.view:"")+"“ gefunden. Prüfe, ob sie in einem gespeicherten Dashboard liegt.");
+  if(!cards[at])throw Error("Flow Card Nr. "+(at+1)+" nicht gefunden: "+cards.length+" gefunden.");
   return cards[at];
 }
 const finitePower=(hass,id)=>{
@@ -296,6 +314,7 @@ class SmartifyEnergyRowCardEditor extends HTMLElement {
     this._editingSlot = null;
     this._status      = "";
     this._loading     = false;
+    this._flowCheck = '';
   }
 
   set hass(h) {
@@ -423,10 +442,13 @@ class SmartifyEnergyRowCardEditor extends HTMLElement {
        <option value="import" ${c.source_mode==="import"?"selected":""}>Einmalig aus Flow Card importieren</option>
       </select>
       ${c.source_mode==="linked"||c.source_mode==="import"?`
-      <label>Dashboard-Pfad (Standard: lovelace)</label><input type="text" id="flow_dashboard" value="${esc(c.flow_dashboard||"lovelace")}">
-      <label>Flow Card Nummer im Dashboard (beginnend bei 1)</label><input type="number" id="flow_index" min="1" value="${c.flow_index||1}">
+      <label>Dashboard-Pfad (auch komplette URL oder /dashboard/ansicht)</label><input type="text" id="flow_dashboard" value="${esc(c.flow_dashboard||"lovelace")}">
+      <label>Flow Card Nummer (beginnend bei 1; bei Ansichtspfad nur innerhalb dieser Ansicht)</label><input type="number" id="flow_index" min="1" value="${c.flow_index||1}">
+      <button class="btn" type="button" id="flow_check">Verbindung prüfen</button>
+      <div class="hint">Beispiel: /dashboard-energiemanager/s-f-c. Flow Card Nummer 1 = erste Flow Card auf dieser Ansicht.</div>
+      ${this._flowCheck?'<div class="status" role="status">'+esc(this._flowCheck)+'</div>':''}
       ${c.source_mode==="import"?'<button class="btn" id="flow_import">Jetzt aus Flow Card übernehmen</button>':""}
-      <div class="hint">Flow Card muss in einem gespeicherten Lovelace-Dashboard liegen. Die Verknüpfung übernimmt Entitäten, Namen und Icons; Reihenfolge/Design dieser Karte bleiben separat.</div>
+      <div class="hint">Flow Card muss im gespeicherten Lovelace-Dashboard liegen. Verknüpfung übernimmt Entitäten, Namen und Icons.</div>
       `:''}
       <div class="section">Anzeige (diese Card)</div>
       <label>Höhe (px)</label>
@@ -470,6 +492,15 @@ class SmartifyEnergyRowCardEditor extends HTMLElement {
         this._dispatchCard({ ...this._cardConfig, [key]: parse(e.target.value) })
       );
     };
+    this.shadowRoot.getElementById("flow_check")?.addEventListener("click",async()=>{
+      this._flowCheck="Prüfe Verbindung …";this._render();
+      try{
+        const flow=await loadFlowConfig(this._hass,this._cardConfig.flow_dashboard,this._cardConfig.flow_index);
+        const slots=resolveFlowSlots(this._hass,flow);
+        this._flowCheck="✓ Flow Card gefunden: "+slots.length+" Datenquellen/Verbraucher erkannt (inklusive "+(slots.find(s=>s.mode==="pv")?.entities?.length||0)+" PV-Anlagen).";
+      }catch(e){this._flowCheck="✕ "+String(e.message||e);}
+      this._render();
+    });
     onCard("source_mode", "source_mode", v => v);
     onCard("flow_dashboard", "flow_dashboard", v => v.trim()||"lovelace");
     onCard("flow_index", "flow_index", v => Math.max(1,parseInt(v)||1));
@@ -547,6 +578,7 @@ class SmartifyEnergyRowCard extends HTMLElement {
     this._flowError = "";
     this._flowFetched = 0;
     this._flowRequest = false;
+    this._flowGeneration = 0;
     this._onReload = e => {
       if (e.detail?.slots) this._slots = mergeSlots(e.detail.slots);
       this._render();
@@ -565,8 +597,12 @@ class SmartifyEnergyRowCard extends HTMLElement {
     this._config = { height: 90, gap: 4, font_size_value: 20, font_size_name: 11,
       background_transparency:0,theme_style:"theme",allow_wrap:true,source_mode:"manual",...config };
     this._flowFetched = 0;
+    this._flowGeneration++;
     this._flowConfig = null;
+    this._flowError = "";
     this._render();
+    // Lovelace can call setConfig without assigning hass again: refresh immediately.
+    if(this._hass?.connection)this._refreshFlowConfig();
   }
 
   set hass(hass) {
@@ -587,10 +623,17 @@ class SmartifyEnergyRowCard extends HTMLElement {
     if(this._config.source_mode!=="linked"||!this._hass?.connection||this._flowRequest)return;
     if(Date.now()-this._flowFetched<15000)return;
     this._flowFetched=Date.now();this._flowRequest=true;
-    try{this._flowConfig=await loadFlowConfig(this._hass,this._config.flow_dashboard,this._config.flow_index);
-      this._flowError="";
-    }catch(e){this._flowConfig=null;this._flowError=String(e.message||e);}
-    finally{this._flowRequest=false;this._render();}
+    const generation=this._flowGeneration;
+    const dashboard=this._config.flow_dashboard,index=this._config.flow_index;
+    try{
+      const flow=await loadFlowConfig(this._hass,dashboard,index);
+      if(generation===this._flowGeneration){this._flowConfig=flow;this._flowError="";}
+    }catch(e){if(generation===this._flowGeneration){this._flowConfig=null;this._flowError=String(e.message||e);}}
+    finally{
+      this._flowRequest=false;
+      this._render();
+      if(generation!==this._flowGeneration)this._refreshFlowConfig();
+    }
   }
 
   connectedCallback() {
@@ -676,7 +719,7 @@ class SmartifyEnergyRowCard extends HTMLElement {
       <div class="row">
         ${visible.length
           ? slotsHTML
-          : `<div class="empty">${esc(linked?(this._flowError||"Lade Flow Card …"):"Bitte Entitäten im Editor konfigurieren.")}</div>`}
+          : `<div class="empty">${esc(linked?(this._flowError||(this._flowConfig?"Flow Card verbunden, aber keine verfügbaren Leistungssensoren gefunden":"Lade Flow Card …")):"Bitte Entitäten im Editor konfigurieren.")}</div>`}
       </div>`;
 
     this.shadowRoot.querySelectorAll(".slot").forEach(el => {
