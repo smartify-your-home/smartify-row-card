@@ -18,7 +18,7 @@ Bei YAML-Lovelace-Ressourcen diese URL als JavaScript-Modul eintragen:
 - **Einmalig importieren:** Gleiche Quellparameter, danach werden die Geräte als eigene Row-Card-Slots übernommen und sind unabhängig.
 - **Manuell:** Vorhandene sechs Standard-Slots weiterhin im Editor einstellen; die Einstellungen werden über den Integrations-WebSocket in HA-Storage gespeichert. Für alle Dashboards gilt dieselbe manuelle Konfiguration.
 
-Die Übernahme unterstützt `solar.plants[]` (PV-Leistungen summiert), `grid.mode=saldo` mit `positive_import`, getrennte Netzsensoren, Batteriespeicher inklusive `invert`, explizite und über Labels erkannte Verbraucher. Die Reihenfolge und Sichtbarkeit können in der Row Card separat eingestellt werden.
+Die Übernahme unterstützt `solar.plants[]` (PV-Leistungen summiert), `grid.mode=saldo` mit `positive_import`, getrennte Netzsensoren, Batteriespeicher inklusive `invert`, explizite und über Labels erkannte Verbraucher. Die Row Card übernimmt im verknüpften Modus die Reihenfolge aus der Quellkonfiguration und ergänzt explizite sowie per Label erkannte Verbraucher. **Eigene Reihenfolge- und Sichtbarkeitsfilter für verknüpfte Slots sind noch nicht im Editor umgesetzt.** Im manuellen Modus bleiben die bestehenden Slot-Einstellungen verfügbar.
 
 ## Darstellung
 
@@ -29,3 +29,11 @@ Theme-basierte Schriftfarben und Flächen, optional eigene Farbverläufe, Hinter
 Wenn eine verknüpfte Flow Card verschoben oder gelöscht wird, zeigt die Row Card einen Konfigurationshinweis an, statt auf falsche Entitäten zu wechseln. Die ursprüngliche `/local/smartify-energy-row.js`-Ressource sollte nach Umstieg aus Lovelace entfernt werden, um doppelte Registrierungen zu vermeiden.
 
 Es werden keine Hardware-Steuerbefehle gesendet. Zur Sicherheit sind Konfigurationsänderungen im gemeinsamen Speicher auf HA-Administratoren begrenzt.
+
+## Entwicklungsstatus und Prüfungen
+
+Der Quellcode enthält `AGENTS.md` mit verbindlichen Entwicklungs- und Release-Regeln sowie CI unter `.github/workflows/validation.yml`. Die Tests prüfen JavaScript-Syntax, Messwertumrechnung (PV, Netzsaldo, getrennte Netzsensoren, Akku), Slot-Import, Label-Erkennung, fehlende Werte, HTML-Escaping und die Integration-Metadaten. 
+
+**Hinweis:** Das Vorhandensein dieser CI-Datei bestätigt noch keinen erfolgreichen GitHub-Actions-Lauf. Vor einem ersten Release sind die tatsächlichen Prüfergebnisse in GitHub Actions und ein realer Home-Assistant-Test einschließlich HACS-Installationsweg, WebSocket-Storage und Karteneditor zu kontrollieren. Bei einem neu angelegten Repository können Actions zunächst deaktiviert sein.
+
+Aktuelle Einschränkungen: Die Live-Verknüpfung verwendet Dashboard-Pfad und Flow-Card-Index (kein stabiler Karten-Identifier). Das bedeutet, dass das Verschieben der Quellkarte die Zuordnung ändern kann. Die automatische Konfigurationsabfrage ist zeitlich begrenzt und erfolgt nicht als echtes Push-Ereignis; Änderungen erscheinen erst bei der nächsten Abfrage. Individuelle Sichtbarkeit/Reihenfolge für verknüpfte Verbraucher wird erst in einem folgenden Ausbau unterstützt.
