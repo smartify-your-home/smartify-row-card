@@ -695,7 +695,7 @@ if (!customElements.get("smartify-energy-row")) customElements.define("smartify-
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "smartify-energy-row",
-  name: "Smartify Energy Row",
+  name: "Smartify Energy Row Card",
   description: "Alle Energiewerte in einer Card — zentral via HA Websocket gespeichert.",
   preview: false,
 });
