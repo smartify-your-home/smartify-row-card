@@ -2,7 +2,7 @@
  * smartify-energy-row-card
  * Lovelace Custom Card — alle Energiewerte in einer Zeile.
  * Config zentral via HA Websocket gespeichert (geräteübergreifend, kein Token nötig).
- * Version: 2.0.2 (standalone integration)
+ * Version: 2.0.3 (standalone integration)
  *
  * Speicherung: eigener Home-Assistant-Store via authentifizierte WebSocket-Endpunkte
  *
@@ -243,6 +243,19 @@ function getBackground(hass, slot, measure) {
   return "var(--card-background-color)";
 }
 
+// Global display filter applies only to consumers, never PV/house/grid/battery sources.
+const SOURCE_SLOT_IDS=new Set(["pv","home","grid","battery"]);
+function isConsumerSlot(slot) {
+  return !SOURCE_SLOT_IDS.has(slot.id) && !["pv","home","grid","flow_grid","battery"].includes(slot.mode);
+}
+function isVisibleWithThreshold(hass,slot,measure,config={}) {
+  if(!isVisible(hass,slot,measure))return false;
+  if(config.hide_low_power_devices!==true || !isConsumerSlot(slot))return true;
+  const limit=Number(config.device_display_threshold_w);
+  if(!Number.isFinite(limit)||limit<0)return true;
+  const watts=slotPower(hass,slot,measure);
+  return watts!=null && Math.abs(watts)>=limit;
+}
 function isVisible(hass, slot, measure) {
   if(["pv","home","flow_grid","battery"].includes(slot.mode)) {
     const w=slotPower(hass,slot,measure);
@@ -476,6 +489,13 @@ class SmartifyEnergyRowCardEditor extends HTMLElement {
       <div class="hint">Flow Card muss im gespeicherten Lovelace-Dashboard liegen. Verknüpfung übernimmt Entitäten, Namen und Icons.</div>
       `:''}
       <div class="section">Anzeige (diese Card)</div>
+      <div class="row">
+        <input type="checkbox" id="hide_low_power_devices" ${c.hide_low_power_devices===true?"checked":""}>
+        <label for="hide_low_power_devices" style="margin:0;font-size:13px">Verbraucher mit geringer Leistung ausblenden</label>
+      </div>
+      <label for="device_display_threshold_w">Ausblenden unter Leistung (W)</label>
+      <input type="number" id="device_display_threshold_w" min="0" step="1" value="${Math.max(0,Number(c.device_display_threshold_w)||0)}" ${c.hide_low_power_devices===true?"":"disabled"}>
+      <div class="hint">Nur Verbraucher. PV, Hausverbrauch, Netz und Akku bleiben sichtbar. Der Grenzwert gilt für manuelle, importierte und verknüpfte Geräte. Ab dem eingestellten Wert wird die Kachel angezeigt.</div>
       <label>Höhe (px)</label>
       <input type="number" id="height" value="${c.height ?? 90}">
       <label>Abstand zwischen Slots (px)</label>
@@ -526,6 +546,9 @@ class SmartifyEnergyRowCardEditor extends HTMLElement {
       }catch(e){this._flowCheck="✕ "+String(e.message||e);}
       this._render();
     });
+    this.shadowRoot.getElementById("hide_low_power_devices")?.addEventListener("change",e=>
+      this._dispatchCard({...this._cardConfig,hide_low_power_devices:e.target.checked}));
+    onCard("device_display_threshold_w","device_display_threshold_w",v=>Math.max(0,Number(v)||0));
     onCard("source_mode", "source_mode", v => v);
     onCard("flow_dashboard", "flow_dashboard", v => v.trim()||"lovelace");
     onCard("flow_index", "flow_index", v => Math.max(1,parseInt(v)||1));
@@ -620,7 +643,8 @@ class SmartifyEnergyRowCard extends HTMLElement {
 
   setConfig(config) {
     this._config = { height: 90, gap: 4, font_size_value: 20, font_size_name: 11,
-      background_transparency:0,theme_style:"theme",allow_wrap:true,source_mode:"manual",...config };
+      background_transparency:0,theme_style:"theme",allow_wrap:true,source_mode:"manual",
+      hide_low_power_devices:false,device_display_threshold_w:0,...config };
     this._flowFetched = 0;
     this._flowGeneration++;
     this._flowConfig = null;
@@ -693,7 +717,7 @@ class SmartifyEnergyRowCard extends HTMLElement {
     const dataSlots=linked?(this._flowConfig?resolveFlowSlots(h,this._flowConfig):[]):this._slots;
     const measurements=dataSlots.some(slot=>["pv","home","flow_grid","battery"].includes(slot.mode))
       ?flowMeasurements(h,dataSlots):null;
-    const visible=dataSlots.filter(s=>isVisible(h,s,measurements));
+    const visible=dataSlots.filter(s=>isVisibleWithThreshold(h,s,measurements,c));
 
     const slotsHTML = visible.map(slot => {
       const bg      = getBackground(h, slot,measurements);
