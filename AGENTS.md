@@ -82,3 +82,8 @@ Dieses Dokument gilt für **jede** Änderung an Smartify Energy Row Card (SERC),
 - Jede Änderung an Dashboard-/Ansichtspfad oder Flow-Card-Nummer muss eine **sofortige** Neuabfrage auslösen, unabhängig davon, ob Lovelace den `hass`-Setter erneut aufruft. Laufende veraltete Requests dürfen neuere Konfigurationen nicht überschreiben.
 - Vollständige HA-URLs, `/dashboard-energiemanager/s-f-c` und `dashboard-energiemanager` müssen funktionieren. Mit Angabe der Ansicht nur diese durchsuchen; ohne Ansicht alle Views.
 - Der Editor muss einen manuellen Verbindungstest mit Erfolgsmeldung (gefundene Quellen) und verwertbarem Fehlercode/-text bieten. Tests müssen diese Fälle abdecken.
+
+## Farbkennzeichnungen (2.0.2)
+- Theme-Stil muss **immer sichtbare Akzentmarkierungen** an den Kacheln zeigen. Transparenz darf nur Hintergrundflächen beeinflussen, nicht die Akzentfarbe.
+- PV gelb, Netzbezug orange, Netzeinspeisung türkis, Akkuladung hellblau, Akkuentladung grün; Verbraucher übernehmen gültige Hex-Farben der Flow Card. Farb-Eingaben gegen CSS-Injektion validieren.
+- Original-Farbverläufe bleiben als alternative Darstellung; Regressionstests für alle Richtungen und Modi sind verpflichtend.
