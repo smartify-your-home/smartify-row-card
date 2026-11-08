@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Smartify Energy Row",
+        "description": "Lovelace-Ressource registrieren und gemeinsame Zeilen-Einstellungen aktivieren."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Smartify Energy Row ist bereits eingerichtet."
+    }
+  }
+}
