@@ -10,7 +10,7 @@ Eigenständige Home-Assistant-Integration mit kompakter Energieleiste und visuel
 4. In einem Dashboard `custom:smartify-energy-row-card` als Karte hinzufügen. Die JS-Ressource wird im Lovelace-Storage-Modus automatisch registriert.
 
 Bei YAML-Lovelace-Ressourcen diese URL als JavaScript-Modul eintragen:
-`/smartify_energy_row_card/smartify-energy-row-card.js?v=2.0.2`.
+`/smartify_energy_row_card/smartify-energy-row-card.js?v=2.0.3`.
 
 ## Datenquellen im Karteneditor
 
@@ -42,7 +42,7 @@ Aktuelle Einschränkungen: Die Live-Verknüpfung verwendet Dashboard-Pfad und Fl
 
 Beispiel: Die Flow Card liegt unter `/dashboard-energiemanager/s-f-c` (zweite Ansicht). Im Row-Card-Editor **Dashboard-Pfad: `dashboard-energiemanager`**, **Flow Card Nummer: `1`**, sofern es die erste Flow Card im gesamten Dashboard ist. `s-f-c` ist der Ansichtspfad und gehört nicht ins Feld.
 
-Seit 1.0.1 werden auch `views[].sections[].cards[]` (Sections-Dashboard) und verschachtelte Karten/Stacks durchsucht. Die Suche verwendet die gespeicherte Lovelace-Konfiguration des angegebenen Dashboards; wird die Flow Card nicht gefunden, nennt die Fehlermeldung jetzt den ausgewählten Dashboard-Pfad. Nach einem Update ggf. HA neu starten, Dashboard neu laden und die automatisch registrierte Ressource `/smartify_energy_row_card/smartify-energy-row-card.js?v=2.0.2` prüfen.
+Seit 1.0.1 werden auch `views[].sections[].cards[]` (Sections-Dashboard) und verschachtelte Karten/Stacks durchsucht. Die Suche verwendet die gespeicherte Lovelace-Konfiguration des angegebenen Dashboards; wird die Flow Card nicht gefunden, nennt die Fehlermeldung jetzt den ausgewählten Dashboard-Pfad. Nach einem Update ggf. HA neu starten, Dashboard neu laden und die automatisch registrierte Ressource `/smartify_energy_row_card/smartify-energy-row-card.js?v=2.0.3` prüfen.
 
 **Einheitliche technische Bezeichnung ab 2.0.0:** Domain `smartify_energy_row_card`, Kartentyp `custom:smartify-energy-row-card`, Ressource `/smartify_energy_row_card/smartify-energy-row-card.js`. GitHub-Repository-URL bleibt unverändert.
 
@@ -61,3 +61,7 @@ Ist die Verbindung weiterhin erfolglos, den genauen Text der **Verbindung prüfe
 ## Farbmarkierungen (2.0.2)
 
 Die Kacheln erhalten nun auch im Theme-Stil eine **farbige Oberkante (4 px)**, während Hintergrund, Text und Transparenz mit dem Home-Assistant-Theme harmonieren. PV = Gelb, Netzbezug = Orange, Netzeinspeisung = Türkis, Akku-Entladung = Grün, Akku-Ladung = Hellblau; Wärmepumpe und weitere bekannte Verbraucher haben passende Akzentfarben. Farben aus `consumers.<entity>.color` der Flow Card werden als Hex-Farbmarkierung übernommen. Im manuellen Modus kann für jeden Slot `accent_color` angegeben werden. Der Theme-Stil **Original-Farbverläufe** bleibt weiterhin verfügbar.
+
+## Verbraucher mit geringer Leistung ausblenden (2.0.3)
+
+Im visuellen Karteneditor unter **Anzeige (diese Card)** den Schalter **Verbraucher mit geringer Leistung ausblenden** aktivieren und **Ausblenden unter Leistung (W)** setzen (z. B. 50). Verbraucher unterhalb des Grenzwertes werden nicht gerendert; bei **genau** 50 W bleiben sie sichtbar. Es wird der Betrag der Leistung in Watt ausgewertet (auch kW-Sensoren und negative Sensorwerte). PV, Hausverbrauch, Netz und Akku sind vom globalen Filter ausgenommen. Der Filter gilt für manuell eingerichtete, importierte und mit einer Flow Card verknüpfte Verbraucher. Der Filter ist standardmäßig deaktiviert und wird pro Lovelace-Karte gespeichert; vorhandene individuelle `hide_below`-Schwellen wirken zusätzlich. Fehlende und ungültige Sensorwerte werden weiterhin nicht als 0 W umgedeutet.
