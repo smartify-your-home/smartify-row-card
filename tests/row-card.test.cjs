@@ -18,7 +18,7 @@ const context=vm.createContext({
   console,URL,Event:class {},requestAnimationFrame(){},
 });
 vm.runInContext(src+`
-  globalThis.testApi={finitePower,resolveFlowSlots,flowMeasurements,slotPower,displayPower,loadFlowConfig,mergeSlots,isVisible,esc,slotAccent,safeAccent,getBackground};`,context);
+  globalThis.testApi={finitePower,resolveFlowSlots,flowMeasurements,slotPower,displayPower,loadFlowConfig,mergeSlots,isVisible,esc,slotAccent,safeAccent,getBackground,isConsumerSlot,isVisibleWithThreshold};`,context);
 const api=context.testApi;
 function hass(states={},entities={}){return {states:Object.fromEntries(Object.entries(states).map(([id,tuple])=>[id,{state:String(tuple[0]),attributes:{unit_of_measurement:tuple[1]||'W'}}])),entities,labels:{}};}
 
@@ -225,4 +225,44 @@ test('linked tiles have gradient definitions for optional legacy visual mode',()
  const slots=api.resolveFlowSlots(hass(),{solar:{power:'sensor.pv'},grid:{mode:'saldo',saldo_power:'sensor.saldo'}});
  assert.equal(slots[0].gradient[0],'#ff9900');
  assert.equal(slots.find(s=>s.mode==='flow_grid').gradient_import.length,2);
+});
+
+test('global device threshold filters linked consumers, but never PV, home, grid or battery',()=>{
+ const h=hass({'sensor.pv':[400,'W'],'sensor.grid':[0,'W'],'sensor.battery':[50,'W'],
+  'sensor.washer':[49,'W'],'sensor.dryer':[50,'W'],'sensor.ev':[1300,'W']});
+ const slots=api.resolveFlowSlots(h,{solar:{power:'sensor.pv'},grid:{mode:'saldo',saldo_power:'sensor.grid'},
+  battery:{power:'sensor.battery'},consumers:{'sensor.washer':{},'sensor.dryer':{},'sensor.ev':{}}});
+ const m=api.flowMeasurements(h,slots),cfg={hide_low_power_devices:true,device_display_threshold_w:50};
+ for(const id of ['pv','home','grid','battery']) assert.equal(api.isVisibleWithThreshold(h,slots.find(x=>x.id===id),m,cfg),true,id);
+ assert.equal(api.isVisibleWithThreshold(h,slots.find(x=>x.entity==='sensor.washer'),m,cfg),false);
+ assert.equal(api.isVisibleWithThreshold(h,slots.find(x=>x.entity==='sensor.dryer'),m,cfg),true);
+ assert.equal(api.isVisibleWithThreshold(h,slots.find(x=>x.entity==='sensor.ev'),m,cfg),true);
+});
+test('filter defaults off, allowing low-power devices, and 0 W can be hidden',()=>{
+ const h=hass({'sensor.washer':[0,'W'],'sensor.dryer':[12,'W']});
+ const washer={id:'sensor.washer',entity:'sensor.washer',hide_below:0};
+ assert.equal(api.isVisibleWithThreshold(h,washer,null,{}),true);
+ assert.equal(api.isVisibleWithThreshold(h,washer,null,{hide_low_power_devices:false,device_display_threshold_w:100}),true);
+ assert.equal(api.isVisibleWithThreshold(h,washer,null,{hide_low_power_devices:true,device_display_threshold_w:1}),false);
+ assert.equal(api.isVisibleWithThreshold(h,{id:'sensor.dryer',entity:'sensor.dryer',hide_below:0},null,
+ {hide_low_power_devices:true,device_display_threshold_w:10}),true);
+});
+test('absolute signed power in W/kW and existing slot hide_below still apply',()=>{
+ const h=hass({'sensor.charger':[-0.12,'kW'],'sensor.washer':[80,'W']});
+ const charger={id:'charger',entity:'sensor.charger',hide_below:0};
+ assert.equal(api.isVisibleWithThreshold(h,charger,null,{hide_low_power_devices:true,device_display_threshold_w:100}),true);
+ assert.equal(api.isVisibleWithThreshold(h,charger,null,{hide_low_power_devices:true,device_display_threshold_w:130}),false);
+ assert.equal(api.isVisibleWithThreshold(h,{id:'sensor.washer',entity:'sensor.washer',hide_below:100},null,
+ {hide_low_power_devices:false,device_display_threshold_w:0}),false);
+});
+test('unavailable device power stays hidden with and without global filter',()=>{
+ const h=hass({'sensor.washer':['unavailable','W']});
+ const slot={id:'sensor.washer',entity:'sensor.washer'};
+ assert.equal(api.isVisibleWithThreshold(h,slot,null,{hide_low_power_devices:true,device_display_threshold_w:50}),false);
+ assert.equal(api.isVisibleWithThreshold(h,slot,null,{hide_low_power_devices:false}),false);
+});
+test('editor exposes configurable display threshold and on-card filtering',()=>{
+ assert.ok(src.includes('id="hide_low_power_devices"'));
+ assert.ok(src.includes('id="device_display_threshold_w"'));
+ assert.ok(src.includes('isVisibleWithThreshold(h,s,measurements,c)'));
 });
