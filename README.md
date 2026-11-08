@@ -1,4 +1,4 @@
-# Smartify Energy Row
+# Smartify Energy Row Card
 
 Eigenständige Home-Assistant-Integration mit kompakter Energieleiste und visueller Konfiguration. **Kein Zugangstoken im Frontend**.
 
@@ -6,7 +6,7 @@ Eigenständige Home-Assistant-Integration mit kompakter Energieleiste und visuel
 
 1. In HACS unter benutzerdefinierte Repositories `https://github.com/smartify-your-home/smartify-row-card` als **Integration** hinzufügen.
 2. Installieren, Home Assistant neu starten.
-3. Unter **Einstellungen → Geräte & Dienste** die Integration **Smartify Energy Row** einmalig hinzufügen.
+3. Unter **Einstellungen → Geräte & Dienste** die Integration **Smartify Energy Row Card** einmalig hinzufügen.
 4. In einem Dashboard `custom:smartify-energy-row` als Karte hinzufügen. Die JS-Ressource wird im Lovelace-Storage-Modus automatisch registriert.
 
 Bei YAML-Lovelace-Ressourcen diese URL als JavaScript-Modul eintragen:
@@ -43,3 +43,5 @@ Aktuelle Einschränkungen: Die Live-Verknüpfung verwendet Dashboard-Pfad und Fl
 Beispiel: Die Flow Card liegt unter `/dashboard-energiemanager/s-f-c` (zweite Ansicht). Im Row-Card-Editor **Dashboard-Pfad: `dashboard-energiemanager`**, **Flow Card Nummer: `1`**, sofern es die erste Flow Card im gesamten Dashboard ist. `s-f-c` ist der Ansichtspfad und gehört nicht ins Feld.
 
 Seit 1.0.1 werden auch `views[].sections[].cards[]` (Sections-Dashboard) und verschachtelte Karten/Stacks durchsucht. Die Suche verwendet die gespeicherte Lovelace-Konfiguration des angegebenen Dashboards; wird die Flow Card nicht gefunden, nennt die Fehlermeldung jetzt den ausgewählten Dashboard-Pfad. Nach einem Update ggf. HA neu starten, Dashboard neu laden und die automatisch registrierte Ressource `/smartify_energy_row/smartify-energy-row.js?v=1.0.1` prüfen.
+
+**Anzeigename in HACS und Home Assistant:** Smartify Energy Row Card. Technische Domain und Lovelace-Kartentyp bleiben aus Kompatibilitätsgründen unverändert.
