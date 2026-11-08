@@ -22,7 +22,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Frontend syntax
-        run: node --check custom_components/smartify_energy_row/frontend/smartify-energy-row.js
+        run: node --check custom_components/smartify_energy_row_card/frontend/smartify-energy-row-card.js
       - name: Frontend regression tests
         run: node --test tests/*.test.cjs
       - name: Python syntax
