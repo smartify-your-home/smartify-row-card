@@ -90,3 +90,41 @@ test('flow dashboard selection and absent flow card are validated',async()=>{
   await assert.rejects(()=>api.loadFlowConfig(h,'energy',1),/Keine Smartify Flow Card/);
   assert.equal(query.url_path,'energy');
 });
+
+test('separate import/export meters retain distinct directions',()=>{
+  const h=hass({'sensor.pv':[2200,'W'],'sensor.import':[150,'W'],'sensor.export':[350,'W']});
+  const slots=api.resolveFlowSlots(h,{solar:{power:'sensor.pv'},grid:{mode:'separate',import_power:'sensor.import',export_power:'sensor.export'}});
+  const m=api.flowMeasurements(h,slots);
+  assert.equal(m.imp,150);
+  assert.equal(m.exp,350);
+  assert.equal(api.slotPower(h,slots.find(x=>x.mode==='flow_grid'),m),-200);
+  assert.equal(m.home,2000);
+});
+test('battery discharge (+) and charge (-) with invert override',()=>{
+  const h=hass({'sensor.pv':[2000,'W'],'sensor.grid':[0,'W'],'sensor.battery':[-1000,'W']});
+  const normal=api.resolveFlowSlots(h,{solar:{power:'sensor.pv'},grid:{mode:'saldo',saldo_power:'sensor.grid'},battery:{power:'sensor.battery'}});
+  const inverted=api.resolveFlowSlots(h,{solar:{power:'sensor.pv'},grid:{mode:'saldo',saldo_power:'sensor.grid'},battery:{power:'sensor.battery',invert:true}});
+  const a=api.flowMeasurements(h,normal), b=api.flowMeasurements(h,inverted);
+  assert.equal(a.battery,-1000);
+  assert.equal(a.home,1000);
+  assert.equal(b.battery,1000);
+  assert.equal(b.home,3000);
+});
+test('missing grid meter prevents invented house consumption',()=>{
+  const h=hass({'sensor.pv':[2500,'W']});
+  const slots=api.resolveFlowSlots(h,{solar:{power:'sensor.pv'},grid:{mode:'saldo',saldo_power:'sensor.grid'}});
+  assert.equal(api.flowMeasurements(h,slots).home,null);
+});
+test('kW and MW inputs convert to watt and invalid non-finite values are missing',()=>{
+  const h=hass({'sensor.kw':[1.5,'kW'],'sensor.mw':[0.002,'MW'],'sensor.inf':['Infinity','W']});
+  assert.equal(api.finitePower(h,'sensor.kw'),1500);
+  assert.equal(api.finitePower(h,'sensor.mw'),2000);
+  assert.equal(api.finitePower(h,'sensor.inf'),null);
+});
+test('UI offers all data sources, transparency, font sizes and theme handling',()=>{
+  for(const term of ['Mit Flow Card verknüpfen','Einmalig aus Flow Card importieren','Eigenständig konfigurieren','background_transparency','font_size_value','font_size_name','--primary-text-color','--secondary-text-color']){
+    assert.ok(src.includes(term),term);
+  }
+  assert.match(src,/slot:before/);
+  assert.doesNotMatch(src,/haCard\.style\.setProperty\("background"/);
+});
