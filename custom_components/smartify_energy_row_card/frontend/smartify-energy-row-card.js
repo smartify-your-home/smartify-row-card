@@ -1,26 +1,25 @@
 /**
- * smartify-energy-row
+ * smartify-energy-row-card
  * Lovelace Custom Card — alle Energiewerte in einer Zeile.
  * Config zentral via HA Websocket gespeichert (geräteübergreifend, kein Token nötig).
- * Version: 1.0.0 (standalone integration)
+ * Version: 2.0.0 (standalone integration)
  *
- * Speicherung: HA "lovelace" Storage via Websocket (lovelace/resources sind schreibbar,
- * wir nutzen einen eigenen lovelace-config "strategy" Namespace zum Ablegen von Daten)
+ * Speicherung: eigener Home-Assistant-Store via authentifizierte WebSocket-Endpunkte
  *
- * Installation: /config/www/smartify-energy-row.js
- * Resource:     /local/smartify-energy-row.js  (type: module)
+ * Installation: custom_components/smartify_energy_row_card/frontend/smartify-energy-row-card.js
+ * Resource:     /smartify_energy_row_card/smartify-energy-row-card.js  (type: module)
  *
  * YAML (in jedem Dashboard identisch):
- *   type: custom:smartify-energy-row
+ *   type: custom:smartify-energy-row-card
  */
 
 // Shared settings are stored by our integration, not by undocumented Lovelace namespaces.
 async function wsGet(conn) {
-  try { return await conn.sendMessagePromise({type:"smartify_energy_row/get"}); }
+  try { return await conn.sendMessagePromise({type:"smartify_energy_row_card/get"}); }
   catch (e) { console.warn("Smartify Row settings could not be loaded",e); return null; }
 }
 async function wsSet(conn,data) {
-  try { await conn.sendMessagePromise({type:"smartify_energy_row/save",slots:data.slots}); return true; }
+  try { await conn.sendMessagePromise({type:"smartify_energy_row_card/save",slots:data.slots}); return true; }
   catch (e) { console.error("Smartify Row settings could not be saved",e); return false; }
 }
 async function loadFlowConfig(hass,dashboard,index) {
@@ -287,7 +286,7 @@ const EDITOR_CSS = `
 
 // ── Editor ───────────────────────────────────────────────────────────────────
 
-class SmartifyEnergyRowEditor extends HTMLElement {
+class SmartifyEnergyRowCardEditor extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
@@ -333,7 +332,7 @@ class SmartifyEnergyRowEditor extends HTMLElement {
     const ok = await wsSet(this._hass.connection, { slots: this._slots });
     this._status = ok ? "✅ Gespeichert" : "❌ Fehler beim Speichern";
     if (ok) {
-      window.dispatchEvent(new CustomEvent("smartify-energy-row-reload", {
+      window.dispatchEvent(new CustomEvent("smartify-energy-row-card-reload", {
         detail: { slots: this._slots }
       }));
     }
@@ -482,7 +481,7 @@ class SmartifyEnergyRowEditor extends HTMLElement {
         this._slots=resolveFlowSlots(this._hass,flow);
         const ok=await wsSet(this._hass.connection,{slots:this._slots});
         if(!ok)throw Error("Speichern fehlgeschlagen (Administratorrechte erforderlich)");
-        window.dispatchEvent(new CustomEvent("smartify-energy-row-reload",{detail:{slots:this._slots}}));
+        window.dispatchEvent(new CustomEvent("smartify-energy-row-card-reload",{detail:{slots:this._slots}}));
         this._status="✅ Import abgeschlossen";this._dispatchCard({...this._cardConfig,source_mode:"manual"});this._render();
       }catch(e){this._status="❌ "+String(e.message||e);this._render();}
     });
@@ -532,11 +531,11 @@ class SmartifyEnergyRowEditor extends HTMLElement {
   }
 }
 
-if (!customElements.get("smartify-energy-row-editor")) customElements.define("smartify-energy-row-editor", SmartifyEnergyRowEditor);
+if (!customElements.get("smartify-energy-row-card-editor")) customElements.define("smartify-energy-row-card-editor", SmartifyEnergyRowCardEditor);
 
 // ── Card ─────────────────────────────────────────────────────────────────────
 
-class SmartifyEnergyRow extends HTMLElement {
+class SmartifyEnergyRowCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
@@ -555,7 +554,7 @@ class SmartifyEnergyRow extends HTMLElement {
   }
 
   static getConfigElement() {
-    return document.createElement("smartify-energy-row-editor");
+    return document.createElement("smartify-energy-row-card-editor");
   }
 
   static getStubConfig() {
@@ -595,7 +594,7 @@ class SmartifyEnergyRow extends HTMLElement {
   }
 
   connectedCallback() {
-    window.addEventListener("smartify-energy-row-reload", this._onReload);
+    window.addEventListener("smartify-energy-row-card-reload", this._onReload);
     this.style.display = "block";
     this.style.margin  = "0";
     this.style.padding = "0";
@@ -603,7 +602,7 @@ class SmartifyEnergyRow extends HTMLElement {
   }
 
   disconnectedCallback() {
-    window.removeEventListener("smartify-energy-row-reload", this._onReload);
+    window.removeEventListener("smartify-energy-row-card-reload", this._onReload);
   }
 
   _handleTap(slot) {
@@ -690,11 +689,11 @@ class SmartifyEnergyRow extends HTMLElement {
   getLayoutOptions() { return { grid_columns: 12, grid_rows: "auto" }; }
 }
 
-if (!customElements.get("smartify-energy-row")) customElements.define("smartify-energy-row", SmartifyEnergyRow);
+if (!customElements.get("smartify-energy-row-card")) customElements.define("smartify-energy-row-card", SmartifyEnergyRowCard);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: "smartify-energy-row",
+  type: "smartify-energy-row-card",
   name: "Smartify Energy Row Card",
   description: "Alle Energiewerte in einer Card — zentral via HA Websocket gespeichert.",
   preview: false,

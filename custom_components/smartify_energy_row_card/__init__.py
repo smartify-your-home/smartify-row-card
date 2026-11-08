@@ -1,4 +1,4 @@
-"""Standalone Smartify Energy Row: versioned frontend and persistent shared settings."""
+"""Standalone Smartify Energy Row Card: versioned frontend and persistent shared settings."""
 from __future__ import annotations
 
 import json
@@ -18,7 +18,7 @@ from .const import DOMAIN, RESOURCE_PATH
 
 _LOGGER = logging.getLogger(__name__)
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
-_CARD = Path(__file__).parent / "frontend" / "smartify-energy-row.js"
+_CARD = Path(__file__).parent / "frontend" / "smartify-energy-row-card.js"
 _VERSION = json.loads((Path(__file__).parent / "manifest.json").read_text(encoding="utf-8"))["version"]
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get"})
@@ -73,13 +73,19 @@ async def _register_resource(hass: HomeAssistant):
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if DOMAIN not in hass.data:
         await hass.http.async_register_static_paths([StaticPathConfig(RESOURCE_PATH, str(_CARD), False)])
-        hass.data[DOMAIN] = {"store": Store(hass, 1, f"{DOMAIN}.settings")}
+        store = Store(hass, 1, f"{DOMAIN}.settings")
+        # One-time migration of previously saved shared slots (never mutate legacy data).
+        if await store.async_load() is None:
+            legacy = await Store(hass, 1, "smartify_energy_row.settings").async_load()
+            if isinstance(legacy, dict) and isinstance(legacy.get("slots"), list):
+                await store.async_save({"slots": legacy["slots"]})
+        hass.data[DOMAIN] = {"store": store}
         websocket_api.async_register_command(hass, _ws_get)
         websocket_api.async_register_command(hass, _ws_save)
     try:
         await _register_resource(hass)
     except Exception:
-        _LOGGER.exception("Could not register Smartify Energy Row frontend resource")
+        _LOGGER.exception("Could not register Smartify Energy Row Card frontend resource")
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
 
-const file=path.join(__dirname,'../custom_components/smartify_energy_row/frontend/smartify-energy-row.js');
+const file=path.join(__dirname,'../custom_components/smartify_energy_row_card/frontend/smartify-energy-row-card.js');
 const src=fs.readFileSync(file,'utf8');
 const registry=new Map();
 class Element {
@@ -24,7 +24,7 @@ function hass(states={},entities={}){return {states:Object.fromEntries(Object.en
 
 test('no embedded secret or legacy Lovelace storage namespace',()=>{
  assert.doesNotMatch(src,/eyJhbGciOiJIUzI1Ni/);
- assert.match(src,/smartify_energy_row\/get/);
+ assert.match(src,/smartify_energy_row_card\/get/);
  assert.doesNotMatch(src,/lovelace\/config\/save/);
 });
 test('multiple solar plants sum and kW converts to W',()=>{
@@ -49,7 +49,7 @@ test('flow source reads stored Lovelace config, not mounted UI',async()=>{
  const card=await api.loadFlowConfig(h,'lovelace',2);assert.equal(card.type,'custom:smartify-flow-card');
 });
 test('registers standalone custom card and editor',()=>{
- assert.ok(registry.has('smartify-energy-row'));assert.ok(registry.has('smartify-energy-row-editor'));
+ assert.ok(registry.has('smartify-energy-row-card'));assert.ok(registry.has('smartify-energy-row-card-editor'));
 });
 
 test('imported slots survive saved reload instead of being truncated to six defaults',()=>{

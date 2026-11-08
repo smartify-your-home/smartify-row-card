@@ -5,15 +5,26 @@ import re
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-INTEGRATION = ROOT / "custom_components" / "smartify_energy_row"
+INTEGRATION = ROOT / "custom_components" / "smartify_energy_row_card"
 
 class RepositoryChecks(unittest.TestCase):
     def test_manifest_hacs_and_resource(self):
         manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(manifest["domain"], "smartify_energy_row")
+        self.assertEqual(manifest["domain"], "smartify_energy_row_card")
+        self.assertEqual(manifest["name"], "Smartify Energy Row Card")
+        self.assertEqual(json.loads((ROOT / "hacs.json").read_text(encoding="utf-8"))["name"], manifest["name"])
+        self.assertFalse((ROOT / "custom_components" / "smartify_energy_row").exists())
+        self.assertEqual(len(list((ROOT / "custom_components").glob("*/manifest.json"))), 1)
         self.assertRegex(manifest["version"], r"^\d+\.\d+\.\d+$")
         self.assertTrue(manifest["config_flow"])
-        self.assertTrue((INTEGRATION / "frontend" / "smartify-energy-row.js").is_file())
+        js = (INTEGRATION / "frontend" / "smartify-energy-row-card.js")
+        self.assertTrue(js.is_file())
+        content = js.read_text(encoding="utf-8")
+        self.assertIn('type: "smartify-energy-row-card"', content)
+        self.assertIn('name: "Smartify Energy Row Card"', content)
+        self.assertIn('customElements.define("smartify-energy-row-card"', content)
+        self.assertIn("smartify_energy_row_card/get", content)
+        self.assertIn("smartify_energy_row_card/save", content)
         self.assertTrue((ROOT / "hacs.json").is_file())
 
     def test_json_translations_are_valid(self):
@@ -34,7 +45,7 @@ class RepositoryChecks(unittest.TestCase):
     def test_resource_path_is_stable(self):
         ns = {}
         exec((INTEGRATION / "const.py").read_text(encoding="utf-8"), ns)
-        self.assertEqual(ns["RESOURCE_PATH"], "/smartify_energy_row/smartify-energy-row.js")
+        self.assertEqual(ns["RESOURCE_PATH"], "/smartify_energy_row_card/smartify-energy-row-card.js")
 
 if __name__ == "__main__":
     unittest.main()

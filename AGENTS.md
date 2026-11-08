@@ -1,17 +1,17 @@
 # AGENTS.md – verbindliche Entwicklungs- und Release-Regeln
 
-Dieses Dokument gilt für **jede** Änderung an Smartify Energy Row (SER), einschließlich Code, Übersetzungen, Dokumentation und Konfiguration. Es ist **keine** bloße Featureliste. Neue Features müssen passende automatische Prüfungen erhalten.
+Dieses Dokument gilt für **jede** Änderung an Smartify Energy Row Card (SERC), einschließlich Code, Übersetzungen, Dokumentation und Konfiguration. Es ist **keine** bloße Featureliste. Neue Features müssen passende automatische Prüfungen erhalten.
 
 ## 1. Pflichtlektüre vor jeder Änderung
 
-1. `AGENTS.md` vollständig lesen, anschließend `README.md`, `custom_components/smartify_energy_row/manifest.json`, die betroffenen Dateien, `tests/` und `.github/workflows/`.
+1. `AGENTS.md` vollständig lesen, anschließend `README.md`, `custom_components/smartify_energy_row_card/manifest.json`, die betroffenen Dateien, `tests/` und `.github/workflows/`.
 2. Den aktuellen `main`-HEAD, offenen PRs und letzten tatsächlich veröffentlichten GitHub-Release prüfen. Keine unbestätigten Tests oder Releases behaupten.
 3. Bei Änderungen an der Flow-Card-Anbindung das **aktuelle** Quellformat in `smartify-your-home/smartify-flow-card` prüfen (insbesondere `solar.plants`, `grid.mode`, `positive_import`, `battery.invert`, Label-Erkennung). Es darf nicht stillschweigend auf einem alten Schema beruhen.
 4. Bestehende Nutzer-Konfigurationen unverändert erhalten oder eine explizite, getestete und dokumentierte Migration bereitstellen.
 
 ## 2. Architektur, Datenhoheit und Integration
 
-- Eigenständige Home-Assistant-Integration; Kartentyp bleibt `custom:smartify-energy-row`. HACS-Installationsweg und automatische Ressourcenregistrierung dürfen nicht ausfallen.
+- Eigenständige Home-Assistant-Integration; Kartentyp bleibt `custom:smartify-energy-row-card`. HACS-Installationsweg und automatische Ressourcenregistrierung dürfen nicht ausfallen.
 - **Drei wählbare Modi:** `manual`, `import`, `linked`.
   - **manual:** eigene, im HA-Store gespeicherte Konfiguration; keine Pflicht zur Flow Card.
   - **import:** einmalige Übernahme als eigener Snapshot. Nach dem Import dürfen neu hinzugefügte Verbraucher auch nach einem HA-Neustart **nicht** verschwinden. Daten werden danach nicht automatisch überschrieben.
@@ -49,7 +49,7 @@ Dieses Dokument gilt für **jede** Änderung an Smartify Energy Row (SER), einsc
 ## 6. Test- und Release-Gates (verpflichtend)
 
 **Vor jeder Zusammenführung oder Veröffentlichung:**
-1. `node --check custom_components/smartify_energy_row/frontend/smartify-energy-row.js`.
+1. `node --check custom_components/smartify_energy_row_card/frontend/smartify-energy-row-card.js`.
 2. `node --test tests/*.test.cjs`: mindestens PV-Mehranlagen, W/kW/MW, Netzsaldo +/- und invertierte Richtung, getrennte Netzsensoren, Akku-Vorzeichen, fehlende Werte, Label/Deduplizierung, Import-Persistenz, Dashboard-Link-Auswahl und Fehler, HTML-Escaping, Registrierungen.
 3. `python -m compileall -q custom_components` sowie JSON-/Manifest-/HACS-Konsistenzprüfung.
 4. CI muss dieselben Gates ausführen und erfolgreich abschließen. **Datei mit Workflow-Schritten allein ist kein Beleg eines laufenden CI-Jobs.** Bei fehlenden Checks: nicht als getestet markieren; GitHub-Actions-Aktivierung prüfen.
@@ -71,4 +71,9 @@ Dieses Dokument gilt für **jede** Änderung an Smartify Energy Row (SER), einsc
 
 ## Einheitliche Produktbezeichnung
 - Der für Nutzer sichtbare Name in HACS (`hacs.json`), HA (`manifest.json`, Flow-Titel, Übersetzungen) und im Lovelace-Kartenkatalog lautet **Smartify Energy Row Card**.
-- Die technische Domain `smartify_energy_row`, der Pfad und der Kartentyp `custom:smartify-energy-row` dürfen durch einen Anzeigenamenswechsel nicht verändert werden. Tests prüfen die Metadaten auf Gleichheit.
+- Ab 2.0.0 sind Domain `smartify_energy_row_card`, JS `smartify-energy-row-card.js`, Ressourcenpfad `/smartify_energy_row_card/smartify-energy-row-card.js` und Kartentyp `custom:smartify-energy-row-card` verbindlich. Neue Implementierungen dürfen keine zweite alte Integrationsdomain enthalten; Ausnahme: dokumentierte und getestete Einmalmigration des alten HA-Storage. Tests prüfen die Metadaten auf Gleichheit.
+
+## Konsistente Namen und Migration ab 2.0.0
+- Alle sichtbaren Namen heißen **Smartify Energy Row Card**. Backend-Domain `smartify_energy_row_card`, Klassen `SmartifyEnergyRowCard*`, Frontend-Datei `smartify-energy-row-card.js`, Kartentyp `custom:smartify-energy-row-card`, WebSocket `smartify_energy_row_card/get` und `smartify_energy_row_card/save`.
+- HACS muss exakt **eine** Integration unter `custom_components/smartify_energy_row_card` finden. Alle Quell-, Workflow-, Dokumentations- und Testpfade müssen übereinstimmen.
+- Migration: alte Konfigurationsdaten im HA-Storage (nur lesend) einmalig übernehmen, wenn neue Daten fehlen; alte Daten nicht löschen. Nutzer müssen Dashboard-Kartentyp und Integrationsinstallation explizit aktualisieren; keine stillen Änderungen an Lovelace-Dashboards.
