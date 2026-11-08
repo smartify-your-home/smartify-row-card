@@ -150,10 +150,12 @@ const DEFAULT_SLOTS = [
 ];
 
 function mergeSlots(saved) {
-  return DEFAULT_SLOTS.map(def => {
-    const found = (saved || []).find(s => s.id === def.id);
-    return found ? { ...def, ...found } : { ...def };
-  });
+  if (!Array.isArray(saved) || !saved.length) return DEFAULT_SLOTS.map(def=>({...def}));
+  const defaults=new Map(DEFAULT_SLOTS.map(def=>[def.id,def]));
+  // Keep all imported Flow Card consumers; they are not limited to six legacy slots.
+  return saved.filter(item=>item&&typeof item.id==="string").map(item=>({
+    ...(defaults.get(item.id)||{show_name:true,hide_below:0}),...item
+  }));
 }
 
 // ── Value / Display Helpers ──────────────────────────────────────────────────
@@ -598,7 +600,7 @@ class SmartifyEnergyRow extends HTMLElement {
   }
 
   _handleTap(slot) {
-    const entityId = slot.entity || slot.entity_secondary;
+    const entityId = slot.entity || slot.entities?.[0] || slot.entity_secondary;
     if (!entityId) return;
     const ev = new Event("hass-more-info", { bubbles: true, composed: true });
     ev.detail = { entityId };
@@ -615,7 +617,8 @@ class SmartifyEnergyRow extends HTMLElement {
 
     const linked=c.source_mode==="linked";
     const dataSlots=linked?(this._flowConfig?resolveFlowSlots(h,this._flowConfig):[]):this._slots;
-    const measurements=linked?flowMeasurements(h,dataSlots):null;
+    const measurements=dataSlots.some(slot=>["pv","home","flow_grid","battery"].includes(slot.mode))
+      ?flowMeasurements(h,dataSlots):null;
     const visible=dataSlots.filter(s=>isVisible(h,s,measurements));
 
     const slotsHTML = visible.map(slot => {
