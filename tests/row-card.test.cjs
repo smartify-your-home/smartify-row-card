@@ -17,8 +17,8 @@ const context=vm.createContext({
   window:{customCards:[],addEventListener(){},removeEventListener(){}},
   console,Event:class {},requestAnimationFrame(){},
 });
-vm.runInContext(src+\`
-  globalThis.testApi={finitePower,resolveFlowSlots,flowMeasurements,slotPower,displayPower,loadFlowConfig};\`,context);
+vm.runInContext(src+`
+  globalThis.testApi={finitePower,resolveFlowSlots,flowMeasurements,slotPower,displayPower,loadFlowConfig};`,context);
 const api=context.testApi;
 function hass(states={},entities={}){return {states:Object.fromEntries(Object.entries(states).map(([id,tuple])=>[id,{state:String(tuple[0]),attributes:{unit_of_measurement:tuple[1]||'W'}}])),entities,labels:{}};}
 
