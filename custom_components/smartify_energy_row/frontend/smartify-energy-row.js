@@ -169,13 +169,9 @@ function getDisplayValue(hass, slot, measure) {
     return displayPower(raw)+(dir?" · "+dir:"");
   }
   if (slot.mode === "grid") {
-    const b = parseFloat(hass?.states[slot.entity]?.state) || 0;
-    const e = parseFloat(hass?.states[slot.entity_secondary]?.state) || 0;
-    return `${Math.round(b || e)} W`;
+    return displayPower(slotPower(hass,slot));
   }
-  const v = getValue(hass, slot);
-  const u = hass?.states[slot.entity]?.attributes?.unit_of_measurement || "W";
-  return `${Math.round(v * 10) / 10} ${u}`;
+  return displayPower(slotPower(hass,slot));
 }
 
 function getBackground(hass, slot, measure) {
@@ -207,9 +203,8 @@ function isVisible(hass, slot, measure) {
   }
   if (slot.mode === "grid") {
     if (!slot.entity && !slot.entity_secondary) return false;
-    const b = parseFloat(hass?.states[slot.entity]?.state) || 0;
-    const e = parseFloat(hass?.states[slot.entity_secondary]?.state) || 0;
-    return (b + e) >= (slot.hide_below || 0);
+    const w=slotPower(hass,slot);
+    return w!=null&&Math.abs(w)>=(slot.hide_below||0);
   }
   if (!slot.entity) return false;
   return getValue(hass, slot) >= (slot.hide_below || 0);
@@ -562,6 +557,7 @@ class SmartifyEnergyRow extends HTMLElement {
     this._config = { height: 90, gap: 4, font_size_value: 20, font_size_name: 11,
       background_transparency:0,theme_style:"theme",allow_wrap:true,source_mode:"manual",...config };
     this._flowFetched = 0;
+    this._flowConfig = null;
     this._render();
   }
 
@@ -631,9 +627,9 @@ class SmartifyEnergyRow extends HTMLElement {
                       ? "scaleX(-1)" : "scaleX(1)";
       return `
         <div class="slot" data-id="${slot.id}"
-             style="background:${c.theme_style==="gradient"?bg:"var(--ha-card-background,var(--card-background-color,#fff))"};height:${height}px;">
+             style="--row-gradient:${bg};height:${height}px;">
           <div class="icon-wrap">
-            <ha-icon icon="${slot.icon}"
+            <ha-icon icon="${esc(slot.icon)}"
               style="color:${iconOff?"transparent":"currentColor"};transform:${flip}"></ha-icon>
             ${overlay}
           </div>
@@ -646,14 +642,12 @@ class SmartifyEnergyRow extends HTMLElement {
       <style>
         :host {display:block;font-family:var(--primary-font-family,inherit);color:var(--primary-text-color);}
         ha-card{padding:0;border-radius:var(--ha-card-border-radius,12px);background:transparent;box-shadow:none;border:none;}
-        .slot{color:var(--primary-text-color);border:1px solid var(--ha-card-border-color,var(--divider-color));}
-        .slot:before{content:"";position:absolute;inset:0;background:var(--ha-card-background,var(--card-background-color,#fff));opacity:0;pointer-events:none;}
+        .slot{color:var(--primary-text-color);border:1px solid var(--ha-card-border-color,var(--divider-color));background:transparent!important;}
+        .slot:before{content:"";position:absolute;inset:0;pointer-events:none;
+          background:${c.theme_style==="gradient"?"var(--row-gradient,var(--ha-card-background,var(--card-background-color,#fff)))":"var(--ha-card-background,var(--card-background-color,#fff))"};
+          opacity:${Math.max(0,Math.min(1,1-(Number(c.background_transparency)||0)/100))};}
         .value,.name,.icon-wrap{position:relative;z-index:1;}
         .name{color:var(--secondary-text-color);}
-        .slot{background-color:var(--card-background-color);background-blend-mode:normal;}
-        .slot{--bg-alpha:${Math.max(0,Math.min(100,100-(Number(c.background_transparency)||0)))}%;}
-        .slot{background-image:none!important;background:color-mix(in srgb,var(--ha-card-background,var(--card-background-color,#fff)) var(--bg-alpha),transparent)!important;}
-        ${c.theme_style==="gradient"?`.slot{background-image:var(--row-gradient)!important;background:color-mix(in srgb,var(--row-gradient,var(--ha-card-background,var(--card-background-color))) var(--bg-alpha),transparent)!important;}`:""}
         .row { display:flex; flex-wrap:${c.allow_wrap===false?"nowrap":"wrap"}; gap:${gap}px; width:100%;
                box-sizing:border-box; line-height:normal; overflow:hidden; }
         .slot { flex:1 1 90px; min-width:65px; border-radius:var(--ha-card-border-radius,8px); display:flex;
