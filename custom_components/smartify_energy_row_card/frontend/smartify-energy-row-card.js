@@ -4,11 +4,10 @@
  * Config zentral via HA Websocket gespeichert (geräteübergreifend, kein Token nötig).
  * Version: 2.0.0 (standalone integration)
  *
- * Speicherung: HA "lovelace" Storage via Websocket (lovelace/resources sind schreibbar,
- * wir nutzen einen eigenen lovelace-config "strategy" Namespace zum Ablegen von Daten)
+ * Speicherung: eigener Home-Assistant-Store via authentifizierte WebSocket-Endpunkte
  *
- * Installation: /config/www/smartify-energy-row-card.js
- * Resource:     /local/smartify-energy-row-card.js  (type: module)
+ * Installation: custom_components/smartify_energy_row_card/frontend/smartify-energy-row-card.js
+ * Resource:     /smartify_energy_row_card/smartify-energy-row-card.js  (type: module)
  *
  * YAML (in jedem Dashboard identisch):
  *   type: custom:smartify-energy-row-card
