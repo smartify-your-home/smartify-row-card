@@ -18,7 +18,7 @@ const context=vm.createContext({
   console,URL,Event:class {},requestAnimationFrame(){},
 });
 vm.runInContext(src+`
-  globalThis.testApi={finitePower,resolveFlowSlots,flowMeasurements,slotPower,displayPower,loadFlowConfig,mergeSlots,isVisible,esc};`,context);
+  globalThis.testApi={finitePower,resolveFlowSlots,flowMeasurements,slotPower,displayPower,loadFlowConfig,mergeSlots,isVisible,esc,slotAccent,safeAccent,getBackground};`,context);
 const api=context.testApi;
 function hass(states={},entities={}){return {states:Object.fromEntries(Object.entries(states).map(([id,tuple])=>[id,{state:String(tuple[0]),attributes:{unit_of_measurement:tuple[1]||'W'}}])),entities,labels:{}};}
 
@@ -198,4 +198,31 @@ test('setConfig with existing hass initiates linked dashboard refresh',async()=>
  await new Promise(resolve=>setImmediate(resolve));
  assert.ok(messages.some(m=>m.type==='lovelace/config'&&m.url_path==='dashboard-energiemanager'));
  assert.ok(card._flowConfig);
+});
+
+test('Flow-linked PV/net/battery/consumers retain visible accent markers',()=>{
+  const h=hass({'sensor.pv':[3000,'W'],'sensor.grid':[500,'W'],'sensor.batt':[-200,'W'],'sensor.wm':[1500,'W']});
+  const slots=api.resolveFlowSlots(h,{solar:{power:'sensor.pv'},grid:{mode:'saldo',saldo_power:'sensor.grid'},battery:{power:'sensor.batt'},
+    consumers:{'sensor.wm':{color:'#aabbcc'}}});
+  const m=api.flowMeasurements(h,slots);
+  assert.equal(api.slotAccent(h,slots.find(s=>s.mode==='pv'),m),'#f5b301');
+  assert.equal(api.slotAccent(h,slots.find(s=>s.mode==='flow_grid'),m),'#f97316');
+  assert.equal(api.slotAccent(h,slots.find(s=>s.mode==='battery'),m),'#38bdf8');
+  assert.equal(api.slotAccent(h,slots.find(s=>s.entity==='sensor.wm'),m),'#aabbcc');
+});
+test('grid import vs export colors follow direction',()=>{
+ const h=hass({'sensor.grid':[-500,'W']});
+ const slots=api.resolveFlowSlots(h,{solar:{},grid:{mode:'saldo',saldo_power:'sensor.grid'}});
+ const m=api.flowMeasurements(h,slots);
+ assert.equal(api.slotAccent(h,slots.find(s=>s.mode==='flow_grid'),m),'#00a896');
+});
+test('untrusted CSS accent input falls back safely',()=>{
+ assert.equal(api.safeAccent('#12abff','#888'),'#12abff');
+ assert.equal(api.safeAccent('red; background:url(http://x)','#888'),'#888');
+ assert.match(src,/border-top:4px solid var\(--row-accent\)/);
+});
+test('linked tiles have gradient definitions for optional legacy visual mode',()=>{
+ const slots=api.resolveFlowSlots(hass(),{solar:{power:'sensor.pv'},grid:{mode:'saldo',saldo_power:'sensor.saldo'}});
+ assert.equal(slots[0].gradient[0],'#ff9900');
+ assert.equal(slots.find(s=>s.mode==='flow_grid').gradient_import.length,2);
 });
