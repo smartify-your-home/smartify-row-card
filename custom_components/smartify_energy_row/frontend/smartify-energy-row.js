@@ -209,7 +209,8 @@ function isVisible(hass, slot, measure) {
     return w!=null&&Math.abs(w)>=(slot.hide_below||0);
   }
   if (!slot.entity) return false;
-  return getValue(hass, slot) >= (slot.hide_below || 0);
+  const w=slotPower(hass,slot);
+  return w!=null && Math.abs(w)>=(slot.hide_below||0);
 }
 
 function getBoilerOverlay(hass, slot) {
@@ -346,7 +347,7 @@ class SmartifyEnergyRowEditor extends HTMLElement {
   }
 
   _datalist(id) {
-    return `<datalist id="${id}">${this._entityList().map(e => `<option value="${e}">`).join("")}</datalist>`;
+    return `<datalist id="${id}">${this._entityList().map(e => `<option value="${esc(e)}">`).join("")}</datalist>`;
   }
 
   _renderSlotEditor(slot) {
@@ -354,31 +355,31 @@ class SmartifyEnergyRowEditor extends HTMLElement {
     const isHP   = slot.mode === "heatpump";
     return `
       <div class="slot-editor">
-        <div class="slot-editor-title">✏️ ${slot.label}</div>
+        <div class="slot-editor-title">✏️ ${esc(slot.label)}</div>
 
         <label>Label</label>
-        <input type="text" data-field="label" value="${slot.label || ""}">
+        <input type="text" data-field="label" value="${esc(slot.label || "")}">
 
         <label>Icon (MDI, z.B. mdi:solar-power)</label>
-        <input type="text" data-field="icon" value="${slot.icon || ""}">
+        <input type="text" data-field="icon" value="${esc(slot.icon || "")}">
 
         ${isGrid ? `
           <label>Entity Netzbezug</label>
           ${this._datalist("sl-e1")}
-          <input list="sl-e1" type="text" data-field="entity" value="${slot.entity || ""}">
+          <input list="sl-e1" type="text" data-field="entity" value="${esc(slot.entity || "")}">
           <label>Entity Netzeinspeisung</label>
           ${this._datalist("sl-e2")}
-          <input list="sl-e2" type="text" data-field="entity_secondary" value="${slot.entity_secondary || ""}">
+          <input list="sl-e2" type="text" data-field="entity_secondary" value="${esc(slot.entity_secondary || "")}">
         ` : `
           <label>Entity${isHP ? " Leistung" : ""}</label>
           ${this._datalist("sl-e1")}
-          <input list="sl-e1" type="text" data-field="entity" value="${slot.entity || ""}">
+          <input list="sl-e1" type="text" data-field="entity" value="${esc(slot.entity || "")}">
         `}
 
         ${isHP ? `
           <label>Entity Aktivität (defrost / hot_water)</label>
           ${this._datalist("sl-act")}
-          <input list="sl-act" type="text" data-field="entity_activity" value="${slot.entity_activity || ""}">
+          <input list="sl-act" type="text" data-field="entity_activity" value="${esc(slot.entity_activity || "")}">
         ` : ""}
 
         <label>Ausblenden unterhalb (W)</label>
@@ -392,7 +393,7 @@ class SmartifyEnergyRowEditor extends HTMLElement {
         <label>Textfarbe</label>
         <div class="color-row">
           <input type="color" id="color_pick" value="${slot.color_text || "#ffffff"}">
-          <input type="text"  data-field="color_text" value="${slot.color_text || ""}">
+          <input type="text"  data-field="color_text" value="${esc(slot.color_text || "")}">
         </div>
 
         <div class="btn-row">
@@ -447,8 +448,8 @@ class SmartifyEnergyRowEditor extends HTMLElement {
             <div class="slot-list">
               ${this._slots.map(s => `
                 <div class="slot-row">
-                  <div class="slot-label">${s.label}</div>
-                  <div class="slot-entity">${s.entity || s.entity_secondary || "— keine Entity —"}</div>
+                  <div class="slot-label">${esc(s.label)}</div>
+                  <div class="slot-entity">${esc(s.entity || s.entity_secondary || "— keine Entity —")}</div>
                   <button class="btn" data-edit="${s.id}">✏️</button>
                 </div>`).join("")}
             </div>
