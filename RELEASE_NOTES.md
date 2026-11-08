@@ -1,10 +1,9 @@
-# Smartify Energy Row Card 2.0.2
+# Smartify Energy Row Card 2.0.3
 
-- Farbige Akzentmarkierungen (4 px Oberkante) im normalen Theme-Stil wiederhergestellt.
-- PV gelb, Netzbezug orange, Netzeinspeisung türkis; Akku lädt hellblau, entlädt grün.
-- Farben aus der Flow Card für Verbraucher übernommen und eigene Akzentfarbe im manuellen Editor verfügbar.
-- Die bisherigen Farbverläufe sind im Stil **Original-Farbverläufe** auswählbar und nun auch für verknüpfte PV-/Netzkacheln definiert.
-- Akzentfarben bleiben auch bei hoher Hintergrundtransparenz sichtbar.
-- Automatische Tests für Akzentfarben, Vorzeichenwechsel, CSS-Validierung und Farbverlaufsdefinitionen ergänzt.
-
-Home Assistant nach dem Update neu starten und das Dashboard neu laden.
+- Neue optionale Anzeigeeinstellung **Verbraucher mit geringer Leistung ausblenden**.
+- Einstellbarer Grenzwert in Watt, z. B. 50 W: darunter ausblenden, ab 50 W anzeigen.
+- Unterstützt manuelle, importierte und mit der Flow Card verknüpfte Verbraucher.
+- PV, Hausverbrauch, Netz und Akku bleiben vom globalen Verbraucherfilter ausgenommen.
+- Grenzwertberechnung unterstützt Watt, Kilowatt und vorzeichenbehaftete Leistung.
+- Pro-Karte-Konfiguration, standardmäßig deaktiviert, ohne Änderungen an vorhandenen Sensoren.
+- Zusätzliche automatische Tests für Grenzfälle und Rückwärtskompatibilität.
