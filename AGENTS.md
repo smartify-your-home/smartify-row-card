@@ -87,3 +87,8 @@ Dieses Dokument gilt für **jede** Änderung an Smartify Energy Row Card (SERC),
 - Theme-Stil muss **immer sichtbare Akzentmarkierungen** an den Kacheln zeigen. Transparenz darf nur Hintergrundflächen beeinflussen, nicht die Akzentfarbe.
 - PV gelb, Netzbezug orange, Netzeinspeisung türkis, Akkuladung hellblau, Akkuentladung grün; Verbraucher übernehmen gültige Hex-Farben der Flow Card. Farb-Eingaben gegen CSS-Injektion validieren.
 - Original-Farbverläufe bleiben als alternative Darstellung; Regressionstests für alle Richtungen und Modi sind verpflichtend.
+
+## Globaler Verbraucher-Anzeigefilter (2.0.3)
+- Pro Row-Card-Instanz müssen `hide_low_power_devices` (standardmäßig false) und `device_display_threshold_w` (Watt, >= 0) im Editor und YAML funktionieren.
+- Filter gilt nur für Geräte/Verbraucher in manual/import/linked; PV, Hausverbrauch, Netz und Akku werden nicht global ausgeblendet. Bestehende individuelle `hide_below`-Grenzen bleiben wirksam.
+- Anzeige bei |Leistung| >= Grenzwert, darunter ausblenden; kW/MW in W umrechnen. Fehlende/ungültige Werte bleiben ungültig, nicht Null. Regressionstests für Standard-off, Grenzwert-Gleichheit und negative Leistung.
