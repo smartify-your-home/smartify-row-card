@@ -77,3 +77,8 @@ Dieses Dokument gilt für **jede** Änderung an Smartify Energy Row Card (SERC),
 - Alle sichtbaren Namen heißen **Smartify Energy Row Card**. Backend-Domain `smartify_energy_row_card`, Klassen `SmartifyEnergyRowCard*`, Frontend-Datei `smartify-energy-row-card.js`, Kartentyp `custom:smartify-energy-row-card`, WebSocket `smartify_energy_row_card/get` und `smartify_energy_row_card/save`.
 - HACS muss exakt **eine** Integration unter `custom_components/smartify_energy_row_card` finden. Alle Quell-, Workflow-, Dokumentations- und Testpfade müssen übereinstimmen.
 - Migration: alte Konfigurationsdaten im HA-Storage (nur lesend) einmalig übernehmen, wenn neue Daten fehlen; alte Daten nicht löschen. Nutzer müssen Dashboard-Kartentyp und Integrationsinstallation explizit aktualisieren; keine stillen Änderungen an Lovelace-Dashboards.
+
+## Verbindungsdiagnose (2.0.1)
+- Jede Änderung an Dashboard-/Ansichtspfad oder Flow-Card-Nummer muss eine **sofortige** Neuabfrage auslösen, unabhängig davon, ob Lovelace den `hass`-Setter erneut aufruft. Laufende veraltete Requests dürfen neuere Konfigurationen nicht überschreiben.
+- Vollständige HA-URLs, `/dashboard-energiemanager/s-f-c` und `dashboard-energiemanager` müssen funktionieren. Mit Angabe der Ansicht nur diese durchsuchen; ohne Ansicht alle Views.
+- Der Editor muss einen manuellen Verbindungstest mit Erfolgsmeldung (gefundene Quellen) und verwertbarem Fehlercode/-text bieten. Tests müssen diese Fälle abdecken.
