@@ -7,10 +7,10 @@ Eigenständige Home-Assistant-Integration mit kompakter Energieleiste und visuel
 1. In HACS unter benutzerdefinierte Repositories `https://github.com/smartify-your-home/smartify-row-card` als **Integration** hinzufügen.
 2. Installieren, Home Assistant neu starten.
 3. Unter **Einstellungen → Geräte & Dienste** die Integration **Smartify Energy Row Card** einmalig hinzufügen.
-4. In einem Dashboard `custom:smartify-energy-row` als Karte hinzufügen. Die JS-Ressource wird im Lovelace-Storage-Modus automatisch registriert.
+4. In einem Dashboard `custom:smartify-energy-row-card` als Karte hinzufügen. Die JS-Ressource wird im Lovelace-Storage-Modus automatisch registriert.
 
 Bei YAML-Lovelace-Ressourcen diese URL als JavaScript-Modul eintragen:
-`/smartify_energy_row/smartify-energy-row.js?v=1.0.1`.
+`/smartify_energy_row_card/smartify-energy-row-card.js?v=2.0.0`.
 
 ## Datenquellen im Karteneditor
 
@@ -26,7 +26,7 @@ Theme-basierte Schriftfarben und Flächen, optional eigene Farbverläufe, Hinter
 
 ## Hinweise
 
-Wenn eine verknüpfte Flow Card verschoben oder gelöscht wird, zeigt die Row Card einen Konfigurationshinweis an, statt auf falsche Entitäten zu wechseln. Die ursprüngliche `/local/smartify-energy-row.js`-Ressource sollte nach Umstieg aus Lovelace entfernt werden, um doppelte Registrierungen zu vermeiden.
+Wenn eine verknüpfte Flow Card verschoben oder gelöscht wird, zeigt die Row Card einen Konfigurationshinweis an, statt auf falsche Entitäten zu wechseln. Nach dem Umstieg alte, manuell registrierte `/local/smartify-energy-row.js`-Ressourcen und die alte Integration entfernen, um doppelte Kartentypen zu vermeiden.
 
 Es werden keine Hardware-Steuerbefehle gesendet. Zur Sicherheit sind Konfigurationsänderungen im gemeinsamen Speicher auf HA-Administratoren begrenzt.
 
@@ -42,6 +42,10 @@ Aktuelle Einschränkungen: Die Live-Verknüpfung verwendet Dashboard-Pfad und Fl
 
 Beispiel: Die Flow Card liegt unter `/dashboard-energiemanager/s-f-c` (zweite Ansicht). Im Row-Card-Editor **Dashboard-Pfad: `dashboard-energiemanager`**, **Flow Card Nummer: `1`**, sofern es die erste Flow Card im gesamten Dashboard ist. `s-f-c` ist der Ansichtspfad und gehört nicht ins Feld.
 
-Seit 1.0.1 werden auch `views[].sections[].cards[]` (Sections-Dashboard) und verschachtelte Karten/Stacks durchsucht. Die Suche verwendet die gespeicherte Lovelace-Konfiguration des angegebenen Dashboards; wird die Flow Card nicht gefunden, nennt die Fehlermeldung jetzt den ausgewählten Dashboard-Pfad. Nach einem Update ggf. HA neu starten, Dashboard neu laden und die automatisch registrierte Ressource `/smartify_energy_row/smartify-energy-row.js?v=1.0.1` prüfen.
+Seit 1.0.1 werden auch `views[].sections[].cards[]` (Sections-Dashboard) und verschachtelte Karten/Stacks durchsucht. Die Suche verwendet die gespeicherte Lovelace-Konfiguration des angegebenen Dashboards; wird die Flow Card nicht gefunden, nennt die Fehlermeldung jetzt den ausgewählten Dashboard-Pfad. Nach einem Update ggf. HA neu starten, Dashboard neu laden und die automatisch registrierte Ressource `/smartify_energy_row_card/smartify-energy-row-card.js?v=2.0.0` prüfen.
 
-**Anzeigename in HACS und Home Assistant:** Smartify Energy Row Card. Technische Domain und Lovelace-Kartentyp bleiben aus Kompatibilitätsgründen unverändert.
+**Einheitliche technische Bezeichnung ab 2.0.0:** Domain `smartify_energy_row_card`, Kartentyp `custom:smartify-energy-row-card`, Ressource `/smartify_energy_row_card/smartify-energy-row-card.js`. GitHub-Repository-URL bleibt unverändert.
+
+## Migration von der früheren Smartify Energy Row
+
+Version 2.0.0 ist eine **technische Umbenennung** (neue Integrations-Domain). Alte Dashboard-Karten mit `type: custom:smartify-energy-row` müssen einmalig auf `type: custom:smartify-energy-row-card` geändert werden. Nach HACS-Installation muss die neue Integration **Smartify Energy Row Card** unter Geräte & Dienste erneut hinzugefügt werden. Das neue Backend übernimmt vorhandene manuelle Slots beim ersten Start aus dem früheren HA-Store `smartify_energy_row.settings`, soweit dieser noch existiert. Deine per Lovelace-Kartenkonfiguration gespeicherten Einstellungen (Dashboard-Pfad, Modus, Schriftgrößen und Transparenz) bleiben erhalten, wenn du die alte Karte nur umbenennst. Die alte Integration und Ressource sollten erst nach erfolgreicher Migration entfernt werden. Es gibt **keine automatische Umbenennung von vorhandenen Dashboard-Kartentypen**.
