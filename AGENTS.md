@@ -68,3 +68,7 @@ Dieses Dokument gilt für **jede** Änderung an Smartify Energy Row (SER), einsc
 ## Sections-Dashboards: Pflichtfall für Link- und Importtests
 - Die Suche muss `views[].sections[].cards[]` ebenso wie klassische `views[].cards[]`, verschachtelte Stacks und Wrapper-Karten berücksichtigen. Beispielpfad `/dashboard-energiemanager/s-f-c`: Dashboard-Schlüssel `dashboard-energiemanager`, View `s-f-c` ist **keine** Kartenindex- oder Dashboard-Eingabe.
 - Tests müssen eine Flow Card auf der zweiten Ansicht unter Sections finden und den Dashboard-Pfad `lovelace/config` exakt prüfen. Fehlerdiagnosen sollen den geprüften Pfad nennen.
+
+## Einheitliche Produktbezeichnung
+- Der für Nutzer sichtbare Name in HACS (`hacs.json`), HA (`manifest.json`, Flow-Titel, Übersetzungen) und im Lovelace-Kartenkatalog lautet **Smartify Energy Row Card**.
+- Die technische Domain `smartify_energy_row`, der Pfad und der Kartentyp `custom:smartify-energy-row` dürfen durch einen Anzeigenamenswechsel nicht verändert werden. Tests prüfen die Metadaten auf Gleichheit.
