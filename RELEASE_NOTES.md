@@ -1,20 +1,13 @@
-# Smartify Energy Row Card 2.0.0
+# Smartify Energy Row Card 2.0.1
 
-## Neuer Name und technische Umstellung
-- Einheitliche HACS- und Home-Assistant-Bezeichnung: **Smartify Energy Row Card**
-- Integrationsdomain: `smartify_energy_row_card`
-- Lovelace-Kartentyp: `custom:smartify-energy-row-card`
-- JavaScript-Ressource: `/smartify_energy_row_card/smartify-energy-row-card.js?v=2.0.0`
-- HACS erhält mit diesem Release einen richtigen SemVer-Tag `v2.0.0`, statt einen Commit-Hash anzuzeigen.
+## Flow Card verknüpfen – Fehlerbehebung
+- Beim Ändern des Dashboard-Pfads wird die Flow-Card-Konfiguration sofort erneut geladen; zuvor war die Neuabfrage abhängig von einem nachfolgenden Home-Assistant-`hass`-Update.
+- Dashboard-Pfade und vollständige URLs werden unterstützt. Für `/dashboard-energiemanager/s-f-c` wird auf der Ansicht `s-f-c` gesucht.
+- Neuer Button **Verbindung prüfen** im visuellen Editor mit konkreten Fehlercodes und Fundzahl.
+- Unterschiedliche Meldungen für nicht verfügbare Sensordaten und nicht gefundene Flow Cards.
+- Regressionstests für URL/View-Auswahl, WebSocket-Fehler und setConfig-Refresh.
 
-## Funktionen
-- Eigenständige Lovelace-Karte mit manuellem Modus, einmaligem Import und Live-Verknüpfung mit einer Smartify Flow Card.
-- Erkennung von Flow Cards in klassischen Dashboards, Sections (auch auf der zweiten Ansicht) sowie verschachtelten Karten.
-- Mehrere PV-Quellen, Netzsaldo mit einstellbarer Vorzeichenrichtung, Akku und Verbraucher.
-- Theme-Anpassung, Schriftgrößen, Hintergrundtransparenz und automatische Umbrüche.
+## Bedienung
+Dashboard-Pfad `/dashboard-energiemanager/s-f-c`, Flow Card Nummer `1`. Nach der Installation HACS aktualisieren und Home Assistant neu starten; bei Problemen **Verbindung prüfen** öffnen und den Fehlertext kontrollieren.
 
-## Wichtig: Wechsel von 1.x auf 2.0.0
-**Breaking Change:** Die technische Domain und der Kartentyp wurden umbenannt. Eine bestehende Row Card muss nach der Installation auf `type: custom:smartify-energy-row-card` umgestellt werden. Die Integration **Smartify Energy Row Card** muss unter Home Assistant Geräte & Dienste eingerichtet werden. Die neue Integration liest bisherige manuelle Slots beim ersten Start aus dem bisherigen HA-Store (sofern vorhanden). Die alte Integration erst danach entfernen.
-
-## Validierung
-Frontend-Syntax, Regressionstests sowie Integration-Metadaten-/Secret-Prüfungen laufen in GitHub Actions vor der Veröffentlichung. Live-Prüfungen im konkreten Home-Assistant-System sind damit nicht ersetzt.
+Ältere Versionshistorie und Breaking-Change-Hinweise siehe README.
