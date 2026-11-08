@@ -18,7 +18,7 @@ const context=vm.createContext({
   console,URL,Event:class {},requestAnimationFrame(){},
 });
 vm.runInContext(src+`
-  globalThis.testApi={finitePower,resolveFlowSlots,flowMeasurements,slotPower,displayPower,loadFlowConfig,mergeSlots,isVisible,esc,slotAccent,safeAccent,getBackground,isConsumerSlot,isVisibleWithThreshold};`,context);
+  globalThis.testApi={finitePower,resolveFlowSlots,flowMeasurements,slotPower,displayPower,loadFlowConfig,mergeSlots,isVisible,esc,slotAccent,safeAccent,getBackground,isConsumerSlot,isVisibleWithThreshold,formatPower,parseShowUnit,normalizeStore,resolveCardConfig,applySlotOverrides,slotDiff,slotGradient,getBar,slotStyleVars,DEFAULT_SLOTS,DEFAULT_SETTINGS,SETTING_FIELDS};`,context);
 const api=context.testApi;
 function hass(states={},entities={}){return {states:Object.fromEntries(Object.entries(states).map(([id,tuple])=>[id,{state:String(tuple[0]),attributes:{unit_of_measurement:tuple[1]||'W'}}])),entities,labels:{}};}
 
@@ -219,7 +219,7 @@ test('grid import vs export colors follow direction',()=>{
 test('untrusted CSS accent input falls back safely',()=>{
  assert.equal(api.safeAccent('#12abff','#888'),'#12abff');
  assert.equal(api.safeAccent('red; background:url(http://x)','#888'),'#888');
- assert.match(src,/border-top:4px solid var\(--row-accent\)/);
+ assert.match(src,/background:var\(--row-bar\)/);
 });
 test('linked tiles have gradient definitions for optional legacy visual mode',()=>{
  const slots=api.resolveFlowSlots(hass(),{solar:{power:'sensor.pv'},grid:{mode:'saldo',saldo_power:'sensor.saldo'}});
@@ -262,7 +262,103 @@ test('unavailable device power stays hidden with and without global filter',()=>
  assert.equal(api.isVisibleWithThreshold(h,slot,null,{hide_low_power_devices:false}),false);
 });
 test('editor exposes configurable display threshold and on-card filtering',()=>{
- assert.ok(src.includes('id="hide_low_power_devices"'));
- assert.ok(src.includes('id="device_display_threshold_w"'));
+ const keys=api.SETTING_FIELDS.map(f=>f.key);
+ assert.ok(keys.includes('hide_low_power_devices'));
+ assert.ok(keys.includes('device_display_threshold_w'));
  assert.ok(src.includes('isVisibleWithThreshold(h,s,measurements,c)'));
+});
+
+// ── 2.1.0: Profile, Overrides, Poolpumpe, Darstellung ──────────────────────
+const plain=v=>JSON.parse(JSON.stringify(v));
+test('default slots include pool pump with level thresholds',()=>{
+ const pool=api.DEFAULT_SLOTS.find(s=>s.id==='poolpump');
+ assert.equal(pool.mode,'poolpump');assert.equal(pool.threshold_mid,600);assert.equal(pool.threshold_high,1200);
+ assert.equal(api.mergeSlots([]).length,7);
+});
+test('pool pump and heat pump gradients follow thresholds',()=>{
+ const pool={...api.DEFAULT_SLOTS.find(s=>s.id==='poolpump'),entity:'sensor.pool'};
+ assert.deepEqual(plain(api.slotGradient(hass({'sensor.pool':[500]}),pool)),['#8ED6FF','#4FC3F7']);
+ assert.deepEqual(plain(api.slotGradient(hass({'sensor.pool':[885]}),pool)),['#FFF59D','#FF9800']);
+ assert.deepEqual(plain(api.slotGradient(hass({'sensor.pool':[1500]}),pool)),['#FFB74D','#D32F2F']);
+ assert.equal(api.slotAccent(hass({'sensor.pool':[885]}),pool),'#f59e0b');
+ const hp={...api.DEFAULT_SLOTS.find(s=>s.id==='heatpump'),entity:'sensor.hp'};
+ assert.deepEqual(plain(api.slotGradient(hass({'sensor.hp':[2144]}),hp)),['#FFB74D','#D32F2F']);
+ assert.equal(api.slotAccent(hass({'sensor.hp':[2144]}),hp),'#ef4444');
+ assert.deepEqual(plain(api.slotGradient(hass({'sensor.pool':[900]}),{...pool,threshold_mid:1000})),['#8ED6FF','#4FC3F7']);
+});
+test('value format: auto switches to kW, w keeps integer watt, kw always kW',()=>{
+ assert.deepEqual(plain(api.formatPower(980,'auto')),{num:'980',unit:'W'});
+ assert.deepEqual(plain(api.formatPower(6240,'auto')),{num:'6.24',unit:'kW'});
+ assert.deepEqual(plain(api.formatPower(6240.4,'w')),{num:'6240',unit:'W'});
+ assert.deepEqual(plain(api.formatPower(-885,'kw')),{num:'0.89',unit:'kW'});
+ assert.deepEqual(plain(api.formatPower(null,'w')),{num:'–',unit:''});
+ assert.equal(api.displayPower(1500),'1.50 kW');
+});
+test('show_unit accepts auto, true and false including legacy booleans',()=>{
+ assert.equal(api.parseShowUnit(undefined),'auto');assert.equal(api.parseShowUnit('auto'),'auto');
+ assert.equal(api.parseShowUnit(true),true);assert.equal(api.parseShowUnit('false'),false);
+});
+test('2.0.x shared slots migrate read-only to profile standard',()=>{
+ const st=api.normalizeStore({slots:[{id:'pv',entity:'sensor.pv'}]});
+ assert.equal(st.profiles.standard.slots[0].entity,'sensor.pv');
+ const kept=api.normalizeStore({slots:[{id:'pv',entity:'old'}],profiles:{standard:{settings:{},slots:[{id:'pv',entity:'new'}]}}});
+ assert.equal(kept.profiles.standard.slots[0].entity,'new');
+ assert.deepEqual(Object.keys(api.normalizeStore({profiles:{'Bad Name':{slots:[]}}}).profiles),[]);
+});
+test('settings resolve defaults < profile < card, card-only keys stay out',()=>{
+ const store={profiles:{standard:{settings:{height:65,icon_size:34,bar_position:'bottom'},slots:[]}}};
+ const r=api.resolveCardConfig({type:'custom:smartify-energy-row-card',height:95,grid_options:{rows:'auto'}},store);
+ assert.equal(r.name,'standard');assert.equal(r.settings.height,95);assert.equal(r.settings.icon_size,34);
+ assert.equal(r.settings.bar_position,'bottom');assert.equal(r.settings.gap,4);
+ assert.equal(r.settings.type,undefined);assert.equal(r.settings.grid_options,undefined);
+ assert.equal(api.resolveCardConfig({profile:'kompakt'},store).profile,null);
+});
+test('profile slots apply and card slot overrides only change listed fields',()=>{
+ const store={profiles:{standard:{settings:{},slots:[{id:'pv',entity:'sensor.pv'},{id:'poolpump',entity:'sensor.pool'}]}}};
+ const r=api.resolveCardConfig({profile:'standard',slots:[{id:'poolpump',hidden:true},{id:'pv',label:'Sonne'}]},store);
+ const pool=r.slots.find(s=>s.id==='poolpump'),pv=r.slots.find(s=>s.id==='pv');
+ assert.equal(pool.hidden,true);assert.equal(pool.entity,'sensor.pool');assert.equal(pool.mode,'poolpump');
+ assert.equal(pv.label,'Sonne');assert.equal(pv.entity,'sensor.pv');
+ const h=hass({'sensor.pool':[900]});
+ assert.equal(api.isVisible(h,pool),false);assert.equal(api.isVisibleWithThreshold(h,pool,null,{}),false);
+});
+test('legacy v4 card YAML with full slot list still renders without a profile',()=>{
+ const legacy=[{id:'pv',label:'PV',icon:'mdi:solar-power',entity:'sensor.pv',hide_below:0,show_name:false,gradient:['#ff9900','#ffc34d'],color_text:'#fff'}];
+ const r=api.resolveCardConfig({height:65,icon_size:34,slots:legacy},{profiles:{}});
+ assert.equal(r.slots.find(s=>s.id==='pv').entity,'sensor.pv');assert.equal(r.settings.icon_size,34);
+});
+test('slot diff stores only changed fields for card overrides',()=>{
+ assert.deepEqual(plain(api.slotDiff({id:'pv',label:'PV',hide_below:0},{id:'pv',label:'PV',hide_below:50})),{id:'pv',hide_below:50});
+});
+test('bar position, radius and border map to theme-overridable CSS (E-Paper)',()=>{
+ const v=api.slotStyleVars({bar_position:'bottom',bar_height:4,border_radius:6,slot_border:false});
+ assert.equal(v.barHeight,4);
+ assert.equal(v.radius,'var(--smartify-energy-row-slot-border-radius,6px)');
+ assert.equal(v.shadow,'var(--smartify-energy-row-slot-shadow,none)');
+ assert.equal(api.slotStyleVars({bar_position:'none'}).barHeight,0);
+ assert.match(api.slotStyleVars({border_radius:null}).radius,/--ha-card-border-radius/);
+ for(const v of ['--smartify-energy-row-text-color','--smartify-energy-row-slot-background','--smartify-energy-row-slot-shadow','--smartify-energy-row-slot-border-radius','--smartify-energy-row-overlay-background'])
+   assert.ok(src.includes(v),v);
+});
+test('bar style gradient uses slot colours, accent style uses accent colour',()=>{
+ const h=hass({'sensor.pv':[3000]});const pv={id:'pv',entity:'sensor.pv',gradient:['#ff9900','#ffc34d']};
+ assert.equal(api.getBar(h,pv,null,'gradient'),'linear-gradient(to right,#ff9900,#ffc34d)');
+ assert.equal(api.getBar(h,pv,null,'accent'),'#f5b301');
+ assert.equal(api.getBar(h,{id:'x',entity:'sensor.pv',gradient:['red;x','#fff']},null,'gradient'),'#64748b');
+});
+test('editor offers profile, icon size, unit, radius and bar options',()=>{
+ const keys=api.SETTING_FIELDS.map(f=>f.key);
+ for(const k of ['icon_size','show_unit','value_format','border_radius','bar_position','bar_style','bar_height','slot_border','text_color'])assert.ok(keys.includes(k),k);
+ for(const term of ['smartify_energy_row_card/save_profile','Nur diese Karte','Neues Profil'])assert.ok(src.includes(term),term);
+});
+test('card renders hidden-slot overrides and selected profile settings',async()=>{
+ const Card=registry.get('smartify-energy-row-card');
+ const card=new Card();
+ const store={profiles:{standard:{settings:{icon_size:34,bar_position:'bottom',value_format:'w'},slots:[{id:'pv',entity:'sensor.pv'},{id:'poolpump',entity:'sensor.pool'}]}}};
+ card.setConfig({profile:'standard',slots:[{id:'poolpump',hidden:true}]});
+ card.hass={connection:{sendMessagePromise:async()=>store},states:hass({'sensor.pv':[6240],'sensor.pool':[900]}).states,entities:{},labels:{}};
+ await new Promise(r=>setImmediate(r));
+ const html=card.shadowRoot.innerHTML;
+ assert.match(html,/6240/);assert.match(html,/--mdc-icon-size:34px/);assert.match(html,/bar bottom/);
+ assert.doesNotMatch(html,/data-id="poolpump"/);
 });

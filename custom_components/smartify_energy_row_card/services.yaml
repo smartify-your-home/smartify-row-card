@@ -1,0 +1,24 @@
+set_profile:
+  fields:
+    name:
+      required: true
+      example: standard
+      selector:
+        text:
+    settings:
+      required: false
+      example: '{"height": 65, "icon_size": 34, "bar_position": "bottom"}'
+      selector:
+        object:
+    slots:
+      required: false
+      example: '[{"id": "pv", "entity": "sensor.pv_leistung"}]'
+      selector:
+        object:
+delete_profile:
+  fields:
+    name:
+      required: true
+      example: kompakt
+      selector:
+        text:

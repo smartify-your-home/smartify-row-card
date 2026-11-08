@@ -74,7 +74,7 @@ Dieses Dokument gilt für **jede** Änderung an Smartify Energy Row Card (SERC),
 - Ab 2.0.0 sind Domain `smartify_energy_row_card`, JS `smartify-energy-row-card.js`, Ressourcenpfad `/smartify_energy_row_card/smartify-energy-row-card.js` und Kartentyp `custom:smartify-energy-row-card` verbindlich. Neue Implementierungen dürfen keine zweite alte Integrationsdomain enthalten; Ausnahme: dokumentierte und getestete Einmalmigration des alten HA-Storage. Tests prüfen die Metadaten auf Gleichheit.
 
 ## Konsistente Namen und Migration ab 2.0.0
-- Alle sichtbaren Namen heißen **Smartify Energy Row Card**. Backend-Domain `smartify_energy_row_card`, Klassen `SmartifyEnergyRowCard*`, Frontend-Datei `smartify-energy-row-card.js`, Kartentyp `custom:smartify-energy-row-card`, WebSocket `smartify_energy_row_card/get` und `smartify_energy_row_card/save`.
+- Alle sichtbaren Namen heißen **Smartify Energy Row Card**. Backend-Domain `smartify_energy_row_card`, Klassen `SmartifyEnergyRowCard*`, Frontend-Datei `smartify-energy-row-card.js`, Kartentyp `custom:smartify-energy-row-card`, WebSocket `smartify_energy_row_card/get`, `smartify_energy_row_card/save`, `smartify_energy_row_card/save_profile` und `smartify_energy_row_card/delete_profile`.
 - HACS muss exakt **eine** Integration unter `custom_components/smartify_energy_row_card` finden. Alle Quell-, Workflow-, Dokumentations- und Testpfade müssen übereinstimmen.
 - Migration: alte Konfigurationsdaten im HA-Storage (nur lesend) einmalig übernehmen, wenn neue Daten fehlen; alte Daten nicht löschen. Nutzer müssen Dashboard-Kartentyp und Integrationsinstallation explizit aktualisieren; keine stillen Änderungen an Lovelace-Dashboards.
 
@@ -92,3 +92,11 @@ Dieses Dokument gilt für **jede** Änderung an Smartify Energy Row Card (SERC),
 - Pro Row-Card-Instanz müssen `hide_low_power_devices` (standardmäßig false) und `device_display_threshold_w` (Watt, >= 0) im Editor und YAML funktionieren.
 - Filter gilt nur für Geräte/Verbraucher in manual/import/linked; PV, Hausverbrauch, Netz und Akku werden nicht global ausgeblendet. Bestehende individuelle `hide_below`-Grenzen bleiben wirksam.
 - Anzeige bei |Leistung| >= Grenzwert, darunter ausblenden; kW/MW in W umrechnen. Fehlende/ungültige Werte bleiben ungültig, nicht Null. Regressionstests für Standard-off, Grenzwert-Gleichheit und negative Leistung.
+
+## Profile und Abweichungen pro Karte (2.1.0)
+- Auflösung immer **Standardwerte → Profil (HA-Storage) → Lovelace-Kartenkonfiguration**. Karten-Overrides in `slots:` sind Teil-Objekte je `id`; nicht genannte Felder kommen aus dem Profil.
+- Alte v4.x-`slots:`-Listen müssen ohne Profil weiter funktionieren (Regressionstest). Gespeicherte 2.0.x-`slots` erscheinen read-only als Profil `standard`; nie still überschreiben.
+- Profilnamen nur `[a-z0-9_-]{1,40}`; Schreiben (WebSocket und Dienste) nur für Administratoren, serverseitig validiert (Typen, max. 50 Profile, 200 Slots, 256 kB).
+- Darstellungsoptionen (`icon_size`, `show_unit`, `value_format`, `bar_position`, `bar_style`, `bar_height`, `border_radius`, `slot_border`, `text_color`) müssen in Profil und Karte gleich wirken. `bar_position: none` ist eine bewusste Abwahl der Akzentmarkierung; Standard bleibt `top`.
+- Theme-Variablen `--smartify-energy-row-*` (E-Paper) haben Vorrang vor Profil- und Kartenwerten.
+- README-Bilder liegen unter `docs/images/` und sind bei sichtbaren Änderungen neu zu erzeugen.

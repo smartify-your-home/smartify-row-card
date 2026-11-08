@@ -3,11 +3,41 @@
     "step": {
       "user": {
         "title": "Smartify Energy Row Card",
-        "description": "Lovelace-Ressource registrieren und gemeinsame Zeilen-Einstellungen aktivieren."
+        "description": "Lovelace-Ressource registrieren und gemeinsame Row-Card-Profile aktivieren."
       }
     },
     "abort": {
       "single_instance_allowed": "Smartify Energy Row Card ist bereits eingerichtet."
+    }
+  },
+  "services": {
+    "set_profile": {
+      "name": "Profil setzen",
+      "description": "Gemeinsames Row-Card-Profil (Einstellungen und Slots) anlegen oder ersetzen.",
+      "fields": {
+        "name": {
+          "name": "Profil",
+          "description": "Profilname (a-z, 0-9, _ und -)."
+        },
+        "settings": {
+          "name": "Einstellungen",
+          "description": "Darstellung, z. B. height, icon_size, bar_position."
+        },
+        "slots": {
+          "name": "Slots",
+          "description": "Liste der Slots mit id, entity und optionalen Optionen."
+        }
+      }
+    },
+    "delete_profile": {
+      "name": "Profil löschen",
+      "description": "Gemeinsames Row-Card-Profil löschen.",
+      "fields": {
+        "name": {
+          "name": "Profil",
+          "description": "Profilname."
+        }
+      }
     }
   }
 }

@@ -3,11 +3,41 @@
     "step": {
       "user": {
         "title": "Smartify Energy Row Card",
-        "description": "Install the Lovelace resource and enable shared row settings."
+        "description": "Install the Lovelace resource and enable shared row card profiles."
       }
     },
     "abort": {
       "single_instance_allowed": "Smartify Energy Row Card is already configured."
+    }
+  },
+  "services": {
+    "set_profile": {
+      "name": "Set profile",
+      "description": "Create or replace a shared row card profile (settings and slots).",
+      "fields": {
+        "name": {
+          "name": "Profile",
+          "description": "Profile name (a-z, 0-9, _ and -)."
+        },
+        "settings": {
+          "name": "Settings",
+          "description": "Display settings, e.g. height, icon_size, bar_position."
+        },
+        "slots": {
+          "name": "Slots",
+          "description": "List of slots with id, entity and optional options."
+        }
+      }
+    },
+    "delete_profile": {
+      "name": "Delete profile",
+      "description": "Delete a shared row card profile.",
+      "fields": {
+        "name": {
+          "name": "Profile",
+          "description": "Profile name."
+        }
+      }
     }
   }
 }
