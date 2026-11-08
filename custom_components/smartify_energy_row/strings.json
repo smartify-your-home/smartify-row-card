@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Smartify Energy Row",
+        "description": "Install the Lovelace resource and enable shared row settings."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Smartify Energy Row is already configured."
+    }
+  }
+}
