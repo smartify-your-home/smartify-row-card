@@ -180,7 +180,9 @@ async def _register_resource(hass: HomeAssistant):
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if DOMAIN not in hass.data:
-        await hass.http.async_register_static_paths([StaticPathConfig(RESOURCE_PATH, str(_CARD), False)])
+        # Long-lived browser cache is safe: the resource URL carries ?v=<manifest version>,
+        # so every release is fetched under a new URL.
+        await hass.http.async_register_static_paths([StaticPathConfig(RESOURCE_PATH, str(_CARD), True)])
         store = Store(hass, 1, f"{DOMAIN}.settings")
         # One-time migration of previously saved shared slots (never mutate legacy data).
         if await store.async_load() is None:

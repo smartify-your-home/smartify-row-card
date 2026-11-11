@@ -1,4 +1,13 @@
-# Smartify Energy Row Card 2.1.0
+# Smartify Energy Row Card 2.1.1
+
+- **Weniger Last im Browser:** Die Karte zeichnet nur noch neu, wenn sich eine angezeigte Entität ändert. Bisher wurde sie bei jeder beliebigen Zustandsänderung in Home Assistant komplett neu aufgebaut.
+- **Profile nach HA-Neustart:** Schlägt das Laden der Profile fehl (z. B. weil Home Assistant noch startet), versucht die Karte es alle 5 Sekunden erneut, statt bis zum Neuladen „Bitte Entitäten im Editor konfigurieren“ zu zeigen.
+- **Schnelleres Laden:** Die Kartendatei wird mit Cache-Headern ausgeliefert (URL ist über `?v=` versioniert). Das verkürzt die Zeit, in der Home Assistant beim Seitenaufbau kurz „Konfigurationsfehler“ zeigen kann.
+- `manifest.json`: `http` und `lovelace` als Abhängigkeiten, damit die Ressource beim Start zuverlässig registriert wird.
+- `getGridOptions()` für aktuelle Home-Assistant-Versionen (Sections-Dashboards); `getLayoutOptions()` bleibt für ältere Versionen.
+- Keine Änderung an Konfiguration, Profilen oder Darstellung. Nach dem Update Home Assistant neu starten und Dashboard/App einmal neu laden.
+
+## Vorherige Version: 2.1.0
 
 - **Profile:** Slots und Darstellung zentral in HA gespeichert (`profile: standard`). Änderungen gelten sofort für alle Karten mit diesem Profil.
 - **Abweichungen pro Karte:** jede Option und einzelne Slot-Felder (z. B. `hidden: true`) lassen sich nur für eine Karte überschreiben. Editor mit Umschalter „Profil / Nur diese Karte“, Reset ↺ und „Abweichungen ins Profil übernehmen“.

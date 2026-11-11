@@ -56,6 +56,16 @@ class RepositoryChecks(unittest.TestCase):
         self.assertIn(f"?v={version}", (ROOT / "README.md").read_text(encoding="utf-8"))
         self.assertIn(f"Version: {version}", (INTEGRATION / "frontend" / "smartify-energy-row-card.js").read_text(encoding="utf-8"))
 
+    def test_manifest_dependencies_and_cached_static_path(self):
+        manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
+        for dep in ("frontend", "http", "lovelace"):
+            self.assertIn(dep, manifest["dependencies"])
+        init = (INTEGRATION / "__init__.py").read_text(encoding="utf-8")
+        # Versioned URL (?v=<version>) => long-lived cache is safe and intended.
+        self.assertIn("StaticPathConfig(RESOURCE_PATH, str(_CARD), True)", init)
+        self.assertIn('f"{RESOURCE_PATH}?v={_VERSION}"', init)
+        self.assertNotIn("add_extra_js_url", init)
+
     def test_resource_path_is_stable(self):
         ns = {}
         exec((INTEGRATION / "const.py").read_text(encoding="utf-8"), ns)

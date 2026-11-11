@@ -1,7 +1,7 @@
 {
   "domain": "smartify_energy_row_card",
   "name": "Smartify Energy Row Card",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "documentation": "https://github.com/smartify-your-home/smartify-row-card",
   "issue_tracker": "https://github.com/smartify-your-home/smartify-row-card/issues",
   "codeowners": [
@@ -11,7 +11,9 @@
   "integration_type": "hub",
   "iot_class": "calculated",
   "dependencies": [
-    "frontend"
+    "frontend",
+    "http",
+    "lovelace"
   ],
   "requirements": []
 }
