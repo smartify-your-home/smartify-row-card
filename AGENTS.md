@@ -1,3 +1,14 @@
+## ⚠️ VERBINDLICH: Laden der Dashboard-Karte (Stand 11.11.2026) – nicht zurückbauen
+
+An den smartify-Repos wird parallel gearbeitet. Diese Regel gilt identisch in `smartify-energy-pro`, `smartify-flow-card`, `smartify-row-card` und `my-weather` und darf von keinem Agenten und keiner Person ohne ausdrückliche Freigabe des Repository-Eigentümers geändert oder „wiederhergestellt“ werden – auch nicht beim Mergen/Rebasen älterer Branches.
+
+1. **Die Karte wird ausschließlich als Lovelace-Ressource geladen** (Storage-Modus, `type: module`, automatisch angelegt/aktualisiert, eigene Duplikate entfernt, Ressourcen-Storage vorher laden).
+2. **Kein `add_extra_js_url` (und kein `extra_module_url`) als regulärer Ladeweg.** Grund: Extra-JS steht im `<head>` der index.html und läuft im Wettlauf mit dem Scoped-Custom-Element-Registry-Polyfill des HA-Frontends. Definiert die Karte ihre Elemente vor dem Polyfill, liefert `customElements.get()` danach nichts mehr und `whenDefined()` löst nie auf → dauerhaft **„Konfigurationsfehler / Custom element doesn't exist“** bis zum Reload. Auf HA 2026.10.4 nachgestellt. Auch eine zusätzliche Ressource mit identischer URL behebt das nicht (Modul wird nicht erneut ausgeführt). Zulässig ist Extra-JS nur als letzter Ersatz, wenn nachweislich keine Storage-Ressource angelegt werden kann (Lovelace-YAML-Modus), mit Log-Hinweis auf den manuellen Eintrag.
+3. **Ressourcen-URL immer versioniert** (`?v=<Version>` bzw. Version+Hash). Wird die Datei mit Cache-Headern ausgeliefert, braucht jede veröffentlichte JS-Änderung eine neue Version.
+4. **Registrierung nur im Event-Loop** (`@callback`/`async def`), bei spät startendem Lovelace wiederholen; fremde Ressourcen nie verändern oder löschen.
+5. `customElements.define` bleibt durch `customElements.get` abgesichert; der `hass`-Setter der Karte darf keine Exception werfen (HA ersetzt die Karte sonst durch „Konfigurationsfehler“).
+6. Vor jedem Push/Merge prüfen: `grep -rn "add_extra_js_url\|extra_module_url" custom_components/` zeigt höchstens den dokumentierten YAML-Fallback. Die zugehörigen Tests dürfen nicht entfernt oder abgeschwächt werden: `tests/test_repository.py` (`test_manifest_dependencies_and_cached_static_path`), `tests/row-card.test.cjs`.
+
 # AGENTS.md – verbindliche Entwicklungs- und Release-Regeln
 
 Dieses Dokument gilt für **jede** Änderung an Smartify Energy Row Card (SERC), einschließlich Code, Übersetzungen, Dokumentation und Konfiguration. Es ist **keine** bloße Featureliste. Neue Features müssen passende automatische Prüfungen erhalten.
