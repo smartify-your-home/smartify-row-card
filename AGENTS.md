@@ -100,3 +100,10 @@ Dieses Dokument gilt für **jede** Änderung an Smartify Energy Row Card (SERC),
 - Darstellungsoptionen (`icon_size`, `show_unit`, `value_format`, `bar_position`, `bar_style`, `bar_height`, `border_radius`, `slot_border`, `text_color`) müssen in Profil und Karte gleich wirken. `bar_position: none` ist eine bewusste Abwahl der Akzentmarkierung; Standard bleibt `top`.
 - Theme-Variablen `--smartify-energy-row-*` (E-Paper) haben Vorrang vor Profil- und Kartenwerten.
 - README-Bilder liegen unter `docs/images/` und sind bei sichtbaren Änderungen neu zu erzeugen.
+
+## Render-Signatur, Profil-Retry und Cache (2.1.1)
+- Der `hass`-Setter darf nicht bei jeder Zustandsänderung neu zeichnen. `_render()` merkt sich in `this._sig` die Zustandsobjekte aller angezeigten Entitäten (`slotEntityIds`: `entity`, `entity_secondary`, `entity_activity`, `entities[]`); `_needsRender()` vergleicht per Identität. Liest ein neues Feature weitere Entitäten, MÜSSEN sie in `slotEntityIds` aufgenommen werden, sonst aktualisiert sich die Anzeige nicht. Im Linked-Modus zusätzlich bei geänderter Entitäts-/Label-Registry. `setConfig`, Store-/Flow-Laden und Reload-Event zeichnen weiterhin immer.
+- Fehlgeschlagenes Laden der Profile (`wsGet` liefert `null`) wird nach `STORE_RETRY_MS` erneut versucht; kein dauerhafter Zustand „nicht geladen“.
+- Die Kartendatei wird mit `StaticPathConfig(..., True)` (langlebiger Browser-Cache) ausgeliefert. Nur sicher, weil die Ressourcen-URL `?v=<VERSION>` trägt: jede veröffentlichte JS-Änderung braucht eine neue Manifest-Version.
+- Die Karte nicht über `add_extra_js_url` einbinden: Extra-JS im `<head>` kann vor dem Custom-Element-Polyfill des HA-Frontends laufen und erzeugt dann dauerhaft „Konfigurationsfehler“ (siehe smartify-energy-pro 0.3.62). Test in `tests/test_repository.py`.
+- `getGridOptions()` ist die aktuelle HA-API; `getLayoutOptions()` bleibt nur für ältere Versionen.

@@ -18,7 +18,7 @@ const context=vm.createContext({
   console,URL,Event:class {},requestAnimationFrame(){},
 });
 vm.runInContext(src+`
-  globalThis.testApi={finitePower,resolveFlowSlots,flowMeasurements,slotPower,displayPower,loadFlowConfig,mergeSlots,isVisible,esc,slotAccent,safeAccent,getBackground,isConsumerSlot,isVisibleWithThreshold,formatPower,parseShowUnit,normalizeStore,resolveCardConfig,applySlotOverrides,slotDiff,slotGradient,getBar,slotStyleVars,DEFAULT_SLOTS,DEFAULT_SETTINGS,SETTING_FIELDS};`,context);
+  globalThis.testApi={slotEntityIds,finitePower,resolveFlowSlots,flowMeasurements,slotPower,displayPower,loadFlowConfig,mergeSlots,isVisible,esc,slotAccent,safeAccent,getBackground,isConsumerSlot,isVisibleWithThreshold,formatPower,parseShowUnit,normalizeStore,resolveCardConfig,applySlotOverrides,slotDiff,slotGradient,getBar,slotStyleVars,DEFAULT_SLOTS,DEFAULT_SETTINGS,SETTING_FIELDS};`,context);
 const api=context.testApi;
 function hass(states={},entities={}){return {states:Object.fromEntries(Object.entries(states).map(([id,tuple])=>[id,{state:String(tuple[0]),attributes:{unit_of_measurement:tuple[1]||'W'}}])),entities,labels:{}};}
 
@@ -361,4 +361,68 @@ test('card renders hidden-slot overrides and selected profile settings',async()=
  const html=card.shadowRoot.innerHTML;
  assert.match(html,/6240/);assert.match(html,/--mdc-icon-size:34px/);assert.match(html,/bar bottom/);
  assert.doesNotMatch(html,/data-id="poolpump"/);
+});
+
+// ── 2.1.1: Render nur bei Änderung angezeigter Entitäten, Profil-Retry, Grid-Optionen ──
+function countRenders(card){let n=0;const orig=card._render.bind(card);card._render=()=>{n++;return orig();};return ()=>n;}
+const tick=()=>new Promise(r=>setTimeout(r,0));
+test('slotEntityIds collects every entity a slot depends on without duplicates',()=>{
+ assert.deepEqual([...api.slotEntityIds([{id:'a',entity:'sensor.a',entity_secondary:'sensor.b',entity_activity:'switch.c'},{id:'pv',entities:['sensor.a','sensor.d']},null,{id:'x',entity:''}])],
+  ['sensor.a','sensor.b','switch.c','sensor.d']);
+});
+test('hass updates re-render only when a displayed entity changed',async()=>{
+ const Card=registry.get('smartify-energy-row-card');const card=new Card();
+ const store={slots:[],profiles:{standard:{settings:{},slots:[{id:'pv',entity:'sensor.pv'}]}}};
+ const conn={sendMessagePromise:async()=>store};
+ const pv={state:'1200',attributes:{unit_of_measurement:'W'}};const other={state:'1',attributes:{}};
+ card.setConfig({profile:'standard'});
+ card.hass={connection:conn,states:{'sensor.pv':pv,'sensor.other':other},entities:{},labels:{}};
+ await tick();
+ const renders=countRenders(card);
+ card.hass={connection:conn,states:{'sensor.pv':pv,'sensor.other':{state:'2',attributes:{}}},entities:{},labels:{}};
+ assert.equal(renders(),0,'unrelated entity must not trigger a render');
+ card.hass={connection:conn,states:{'sensor.pv':{state:'850',attributes:{unit_of_measurement:'W'}},'sensor.other':other},entities:{},labels:{}};
+ assert.equal(renders(),1);
+ assert.match(card.shadowRoot.innerHTML,/850/);
+ card.hass={connection:conn,states:{'sensor.other':other},entities:{},labels:{}};
+ assert.equal(renders(),2,'removed entity must trigger a render');
+ card.setConfig({profile:'standard',height:120});
+ assert.equal(renders(),3,'config change always renders');
+});
+test('linked mode re-renders when the entity or label registry changes',async()=>{
+ const Card=registry.get('smartify-energy-row-card');const card=new Card();
+ const flow={views:[{cards:[{type:'custom:smartify-flow-card',solar:{power:'sensor.pv'},grid:{mode:'saldo',saldo_power:'sensor.grid'}}]}]};
+ const conn={sendMessagePromise:async m=>m.type==='lovelace/config'?flow:{slots:[],profiles:{}}};
+ const states=hass({'sensor.pv':[1000],'sensor.grid':[-200]}).states;const entities={},labels={};
+ card.setConfig({source_mode:'linked',flow_dashboard:'dashboard-x',flow_index:1});
+ card.hass={connection:conn,states,entities,labels};
+ await tick();await tick();
+ const renders=countRenders(card);
+ card.hass={connection:conn,states,entities,labels};
+ assert.equal(renders(),0);
+ card.hass={connection:conn,states,entities:{},labels};
+ assert.equal(renders(),1);
+});
+test('failed profile load is retried instead of staying on defaults',async()=>{
+ const Card=registry.get('smartify-energy-row-card');const card=new Card();
+ let fail=true,calls=0;
+ const conn={sendMessagePromise:async()=>{calls++;if(fail)throw Error('unknown_command');return {slots:[],profiles:{standard:{settings:{},slots:[{id:'pv',entity:'sensor.pv'}]}}};}};
+ const h={connection:conn,states:hass({'sensor.pv':[777]}).states,entities:{},labels:{}};
+ const warn=console.warn;console.warn=()=>{};
+ try{
+  card.setConfig({profile:'standard'});card.hass=h;await tick();
+  assert.equal(calls,1);assert.equal(card._store.loaded,false);
+  card.hass=h;await tick();
+  assert.equal(calls,1,'no retry before the retry delay');
+  fail=false;card._loadRetryAt=0;
+  card.hass=h;await tick();
+  assert.equal(calls,2);assert.equal(card._store.loaded,true);
+  assert.match(card.shadowRoot.innerHTML,/777/);
+ }finally{console.warn=warn;}
+});
+test('card exposes grid options for sections dashboards and registers once',()=>{
+ const Card=registry.get('smartify-energy-row-card');const card=new Card();
+ assert.deepEqual({...card.getGridOptions()},{columns:12,rows:'auto'});
+ assert.deepEqual({...card.getLayoutOptions()},{grid_columns:12,grid_rows:'auto'});
+ assert.match(src,/window\.customCards\.some\(c => c\.type === "smartify-energy-row-card"\)/);
 });

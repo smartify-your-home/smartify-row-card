@@ -3,7 +3,7 @@
  * Lovelace Custom Card — alle Energiewerte in einer Zeile.
  * Profile zentral via HA Websocket gespeichert (geräteübergreifend, kein Token nötig),
  * Abweichungen pro Karte in der Lovelace-Kartenkonfiguration.
- * Version: 2.1.0 (standalone integration)
+ * Version: 2.1.1 (standalone integration)
  *
  * Speicherung: eigener Home-Assistant-Store via authentifizierte WebSocket-Endpunkte
  *
@@ -284,6 +284,19 @@ function slotDiff(base, updated) {
 }
 
 // ── Value / Display Helpers ──────────────────────────────────────────────────
+
+// Alle Entitäten, deren Zustand die Darstellung der Slots beeinflusst.
+function slotEntityIds(slots) {
+  const ids = new Set();
+  for (const s of Array.isArray(slots) ? slots : []) {
+    if (!s) continue;
+    for (const id of [s.entity, s.entity_secondary, s.entity_activity, ...(Array.isArray(s.entities) ? s.entities : [])])
+      if (typeof id === "string" && id) ids.add(id);
+  }
+  return [...ids];
+}
+// Nach einem fehlgeschlagenen Laden der Profile (z. B. HA startet noch) erneut versuchen.
+const STORE_RETRY_MS = 5000;
 
 function getValue(hass, slot) {
   return finitePower(hass,slot.entity);
@@ -980,6 +993,8 @@ class SmartifyEnergyRowCard extends HTMLElement {
     this._config = {};
     this._store  = { profiles: {}, loaded: false };
     this._loaded = false;
+    this._loadRetryAt = 0;
+    this._sig = null;
     this._flowConfig = null;
     this._flowError = "";
     this._flowFetched = 0;
@@ -1017,17 +1032,36 @@ class SmartifyEnergyRowCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     this._refreshFlowConfig();
-    if (!this._loaded && hass?.connection) {
+    if (!this._loaded && hass?.connection && Date.now() >= this._loadRetryAt) {
       this._loaded = true;
       wsGet(hass.connection).then(data => {
+        if (!data) {
+          // Laden fehlgeschlagen (z. B. Integration noch nicht bereit): später erneut versuchen,
+          // statt dauerhaft „Bitte Entitäten im Editor konfigurieren“ zu zeigen.
+          this._loaded = false;
+          this._loadRetryAt = Date.now() + STORE_RETRY_MS;
+          return;
+        }
         this._store = normalizeStore(data);
         this._flowFetched = 0;
         this._refreshFlowConfig();
         this._render();
       });
-    } else {
+    } else if (this._needsRender(hass)) {
       this._render();
     }
+  }
+
+  // Home Assistant ruft den hass-Setter bei JEDER Zustandsänderung im System auf.
+  // Neu zeichnen nur, wenn sich eine angezeigte Entität (oder im Linked-Modus die
+  // Entitäts-/Label-Registry) geändert hat. Zustandsobjekte werden von HA bei jeder
+  // Änderung ersetzt, daher genügt ein Identitätsvergleich.
+  _needsRender(hass) {
+    const sig = this._sig;
+    if (!sig) return true;
+    if (sig.linked && (sig.entities !== hass?.entities || sig.labels !== hass?.labels)) return true;
+    const states = hass?.states || {};
+    return sig.ids.some((id, i) => states[id] !== sig.states[i]);
   }
 
   async _refreshFlowConfig(){
@@ -1115,6 +1149,8 @@ class SmartifyEnergyRowCard extends HTMLElement {
       :resolved.slots;
     const measurements=dataSlots.some(slot=>["pv","home","flow_grid","battery"].includes(slot.mode))
       ?flowMeasurements(h,dataSlots):null;
+    const sigIds=slotEntityIds(dataSlots);
+    this._sig={ids:sigIds,states:sigIds.map(id=>h?.states?.[id]),linked,entities:h?.entities,labels:h?.labels};
     const visible=dataSlots.filter(s=>isVisibleWithThreshold(h,s,measurements,c));
     const missingProfile = resolved.explicitProfile && this._store.loaded && !resolved.profile && !Array.isArray(this._config.slots);
 
@@ -1192,6 +1228,8 @@ class SmartifyEnergyRowCard extends HTMLElement {
   }
 
   getCardSize()      { return 1; }
+  getGridOptions()   { return { columns: 12, rows: "auto" }; }
+  // Ältere Home-Assistant-Versionen (vor getGridOptions).
   getLayoutOptions() { return { grid_columns: 12, grid_rows: "auto" }; }
 }
 
@@ -1199,7 +1237,7 @@ if (!customElements.get("smartify-energy-row-card")) customElements.define("smar
 
 
 window.customCards = window.customCards || [];
-window.customCards.push({
+if (!window.customCards.some(c => c.type === "smartify-energy-row-card")) window.customCards.push({
   type: "smartify-energy-row-card",
   name: "Smartify Energy Row Card",
   description: "Alle Energiewerte in einer Zeile — zentrale Profile, Abweichungen pro Karte.",
