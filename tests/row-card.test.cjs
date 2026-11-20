@@ -18,7 +18,7 @@ const context=vm.createContext({
   console,URL,Event:class {},requestAnimationFrame(){},
 });
 vm.runInContext(src+`
-  globalThis.testApi={slotEntityIds,finitePower,resolveFlowSlots,flowMeasurements,slotPower,displayPower,loadFlowConfig,mergeSlots,isVisible,esc,slotAccent,safeAccent,getBackground,isConsumerSlot,isVisibleWithThreshold,formatPower,parseShowUnit,normalizeStore,resolveCardConfig,applySlotOverrides,slotDiff,slotGradient,getBar,slotStyleVars,DEFAULT_SLOTS,DEFAULT_SETTINGS,SETTING_FIELDS};`,context);
+  globalThis.testApi={slotEntityIds,finitePower,resolveFlowSlots,flowMeasurements,slotPower,displayPower,loadFlowConfig,mergeSlots,isVisible,esc,slotAccent,safeAccent,getBackground,isConsumerSlot,isVisibleWithThreshold,formatPower,parseShowUnit,normalizeStore,resolveCardConfig,applySlotOverrides,slotDiff,slotGradient,getBar,slotStyleVars,autoEnergyEntity,todayEntityIds,formatEnergy,todayText,isEnergySensor,DEFAULT_SLOTS,DEFAULT_SETTINGS,SETTING_FIELDS};`,context);
 const api=context.testApi;
 function hass(states={},entities={}){return {states:Object.fromEntries(Object.entries(states).map(([id,tuple])=>[id,{state:String(tuple[0]),attributes:{unit_of_measurement:tuple[1]||'W'}}])),entities,labels:{}};}
 
@@ -425,4 +425,69 @@ test('card exposes grid options for sections dashboards and registers once',()=>
  assert.deepEqual({...card.getGridOptions()},{columns:12,rows:'auto'});
  assert.deepEqual({...card.getLayoutOptions()},{grid_columns:12,grid_rows:'auto'});
  assert.match(src,/window\.customCards\.some\(c => c\.type === "smartify-energy-row-card"\)/);
+});
+
+// ── Tageswerte (2.2.0) ──────────────────────────────────────────────────────
+const en=(state,extra={})=>({state:String(state),attributes:{unit_of_measurement:'kWh',device_class:'energy',state_class:'total_increasing',...extra}});
+test('today: energy counter on the same device is detected, ambiguity is not guessed',()=>{
+ const states={'sensor.wb_power':{state:'1',attributes:{unit_of_measurement:'W'}},'sensor.wb_energy':en(5),
+  'sensor.m_power':{state:'1',attributes:{unit_of_measurement:'W'}},'sensor.m_a':en(1),'sensor.m_b':en(2),
+  'sensor.g_power':{state:'1',attributes:{unit_of_measurement:'W'}},'sensor.g_import':en(1),'sensor.g_export':en(2)};
+ const entities={'sensor.wb_power':{entity_id:'sensor.wb_power',device_id:'d1'},'sensor.wb_energy':{entity_id:'sensor.wb_energy',device_id:'d1'},
+  'sensor.m_power':{entity_id:'sensor.m_power',device_id:'d2'},'sensor.m_a':{entity_id:'sensor.m_a',device_id:'d2'},'sensor.m_b':{entity_id:'sensor.m_b',device_id:'d2'},
+  'sensor.g_power':{entity_id:'sensor.g_power',device_id:'d3'},'sensor.g_import':{entity_id:'sensor.g_import',device_id:'d3'},'sensor.g_export':{entity_id:'sensor.g_export',device_id:'d3'}};
+ const h={states,entities};
+ assert.equal(api.autoEnergyEntity(h,'sensor.wb_power'),'sensor.wb_energy');
+ assert.equal(api.autoEnergyEntity(h,'sensor.m_power'),null,'two counters: no guess');
+ assert.equal(api.autoEnergyEntity(h,'sensor.g_power'),'sensor.g_import','export counter is ignored');
+ assert.equal(api.autoEnergyEntity(h,'sensor.unknown'),null);
+});
+test('today: explicit sensor wins, no auto for grid/home/battery, PV plants need all counters',()=>{
+ const h={states:{'sensor.p1':en(1),'sensor.p2':en(2)},entities:{'sensor.pv1':{entity_id:'sensor.pv1',device_id:'a'},'sensor.p1':{entity_id:'sensor.p1',device_id:'a'},
+  'sensor.pv2':{entity_id:'sensor.pv2',device_id:'b'},'sensor.p2':{entity_id:'sensor.p2',device_id:'b'}}};
+ assert.deepEqual(JSON.parse(JSON.stringify(api.todayEntityIds(h,{id:'x',entity:'sensor.pv1',entity_today:'sensor.manual'}))),{a:['sensor.manual'],b:null});
+ assert.deepEqual(JSON.parse(JSON.stringify(api.todayEntityIds(h,{id:'pv',mode:'pv',entities:['sensor.pv1','sensor.pv2']}))),{a:['sensor.p1','sensor.p2'],b:null});
+ assert.equal(api.todayEntityIds(h,{id:'pv',mode:'pv',entities:['sensor.pv1','sensor.none']}).a,null);
+ assert.equal(api.todayEntityIds(h,{id:'grid',mode:'grid',entity:'sensor.pv1'}).a,null);
+ assert.deepEqual(JSON.parse(JSON.stringify(api.todayEntityIds(h,{id:'grid',mode:'grid',entity_today:'sensor.i',entity_today_secondary:'sensor.e'}))),{a:['sensor.i'],b:['sensor.e']});
+});
+test('today: formatting and missing values stay missing',()=>{
+ assert.equal(api.formatEnergy(12.44),'12.4');assert.equal(api.formatEnergy(0.04),'0.0');assert.equal(api.formatEnergy(123.6),'124');
+ assert.equal(api.formatEnergy(null),'–');assert.equal(api.formatEnergy(NaN),'–');
+ assert.equal(api.todayText(undefined),'');assert.equal(api.todayText({a:undefined,b:undefined}),'');
+ assert.equal(api.todayText({a:12.4,b:undefined}),'12.4 kWh');assert.equal(api.todayText({a:12.4,b:3.1}),'12.4 / 3.1 kWh');
+ assert.equal(api.todayText({a:null,b:undefined}),'– kWh');
+ assert.equal(api.DEFAULT_SETTINGS.show_today,false,'off by default');
+ assert.ok(api.SETTING_FIELDS.some(f=>f.key==='show_today'));
+});
+test('today: card loads statistics once, renders small icon and value, refreshes only after interval',async()=>{
+ const Card=registry.get('smartify-energy-row-card');const card=new Card();
+ const store={slots:[],profiles:{standard:{settings:{show_today:true,today_icon_size:14},slots:[{id:'charger',entity:'sensor.wb',entity_today:'sensor.wb_energy'}]}}};
+ const conn={sendMessagePromise:async()=>store};const calls=[];
+ const callWS=async m=>{calls.push(m);return {change:7.26};};
+ const states={'sensor.wb':{state:'2200',attributes:{unit_of_measurement:'W'}},'sensor.wb_energy':en(100)};
+ card.setConfig({profile:'standard'});
+ card.hass={connection:conn,callWS,states,entities:{},labels:{}};
+ await tick();
+ card.hass={connection:conn,callWS,states,entities:{},labels:{}};
+ await tick();await tick();
+ assert.equal(calls.length,1);
+ assert.equal(calls[0].type,'recorder/statistic_during_period');assert.equal(calls[0].statistic_id,'sensor.wb_energy');
+ assert.deepEqual(JSON.parse(JSON.stringify(calls[0].calendar)),{period:'day'});
+ const html=card.shadowRoot.innerHTML;
+ assert.match(html,/7\.3 kWh/);assert.match(html,/--mdc-icon-size:14px/);
+ card.hass={connection:conn,callWS,states,entities:{},labels:{}};await tick();
+ assert.equal(calls.length,1,'no reload within the refresh interval');
+});
+test('today: off by default renders no daily value and makes no statistics calls',async()=>{
+ const Card=registry.get('smartify-energy-row-card');const card=new Card();
+ const store={slots:[],profiles:{standard:{settings:{},slots:[{id:'charger',entity:'sensor.wb',entity_today:'sensor.wb_energy'}]}}};
+ const conn={sendMessagePromise:async()=>store};const calls=[];
+ const callWS=async m=>{calls.push(m);return {change:1};};
+ const states={'sensor.wb':{state:'2200',attributes:{unit_of_measurement:'W'}}};
+ card.setConfig({profile:'standard'});
+ card.hass={connection:conn,callWS,states,entities:{},labels:{}};await tick();
+ card.hass={connection:conn,callWS,states,entities:{},labels:{}};await tick();
+ assert.equal(calls.length,0);assert.doesNotMatch(card.shadowRoot.innerHTML,/kWh/);
+ assert.match(card.shadowRoot.innerHTML,/--mdc-icon-size:24px/);
 });

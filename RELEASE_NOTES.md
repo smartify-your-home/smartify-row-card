@@ -1,4 +1,12 @@
-# Smartify Energy Row Card 2.1.1
+# Smartify Energy Row Card 2.2.0
+
+- **Tageswerte (optional):** `show_today: true` zeigt in jeder Kachel ein kleineres Icon und daneben die Energie seit Mitternacht (kWh). Die aktuelle Leistung bleibt der große Wert. Standard: aus – bestehende Karten sehen unverändert aus.
+- Quelle je Slot `entity_today` (Tages- oder Gesamtzähler, Wert aus der Recorder-Statistik des Kalendertags). Leer: automatisch der einzige Energiezähler am Gerät des Leistungssensors; bei mehreren wird nicht geraten.
+- Netz/Akku zusätzlich `entity_today_secondary` (Einspeisung bzw. Ladung), Anzeige `Bezug / Einspeisung kWh`.
+- Neue Optionen `today_icon_size` (16) und `font_size_today` (12), im Profil und pro Karte; Editor-Felder je Slot mit Auswahl nur passender Energie-Sensoren.
+- Aktualisierung alle 5 Minuten; fehlende Statistik wird als `–` angezeigt, nie als 0.
+
+## Vorherige Version: 2.1.1
 
 - **Weniger Last im Browser:** Die Karte zeichnet nur noch neu, wenn sich eine angezeigte Entität ändert. Bisher wurde sie bei jeder beliebigen Zustandsänderung in Home Assistant komplett neu aufgebaut.
 - **Profile nach HA-Neustart:** Schlägt das Laden der Profile fehl (z. B. weil Home Assistant noch startet), versucht die Karte es alle 5 Sekunden erneut, statt bis zum Neuladen „Bitte Entitäten im Editor konfigurieren“ zu zeigen.

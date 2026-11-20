@@ -12,7 +12,7 @@ Eigenständige Home-Assistant-Integration mit kompakter Energieleiste und visuel
 4. In einem Dashboard `custom:smartify-energy-row-card` als Karte hinzufügen. Die JS-Ressource wird im Lovelace-Storage-Modus automatisch registriert.
 
 Bei YAML-Lovelace-Ressourcen diese URL als JavaScript-Modul eintragen:
-`/smartify_energy_row_card/smartify-energy-row-card.js?v=2.1.1`.
+`/smartify_energy_row_card/smartify-energy-row-card.js?v=2.2.0`.
 
 ## Profile: einmal einstellen, überall verwenden (2.1.0)
 
@@ -91,6 +91,8 @@ Alle Optionen sind im Profil **und** pro Karte einstellbar:
 | `text_color` | `theme`, `slot` | `theme` | Theme-Textfarbe oder `color_text` je Slot |
 | `background_transparency` | 0–100 | 0 | betrifft nur den Hintergrund |
 | `allow_wrap` | `true`/`false` | `true` | Zeilenumbruch auf schmalen Bildschirmen statt Verkleinerung |
+| `show_today` | `true`/`false` | `false` | Tageswert (kWh seit Mitternacht) neben einem kleineren Icon |
+| `today_icon_size` / `font_size_today` | px | 16 / 12 | Icon-Größe und Schriftgröße, solange Tageswerte an sind |
 
 ![Farbbalken oben, einfarbig](docs/images/top.png)
 
@@ -99,6 +101,18 @@ Alle Optionen sind im Profil **und** pro Karte einstellbar:
 Auf dem Handy: links einzeilig mit `show_unit: auto` (Einheit fällt weg, Schrift wird kleiner), rechts mit Zeilenumbruch.
 
 ![Handy](docs/images/mobile.png)
+
+### Tageswerte (2.2.0)
+
+Mit `show_today: true` wird das Icon kleiner und daneben steht die Energie seit Mitternacht. Die aktuelle Leistung bleibt der große Wert.
+
+![Tageswerte](docs/images/today.png)
+
+- Quelle je Slot: `entity_today` (Energie-Sensor in Wh/kWh/MWh mit `state_class` `total_increasing` oder `total`). Ein Tageszähler (z. B. `utility_meter` täglich) und ein Gesamtzähler liefern dasselbe Ergebnis, weil der Wert aus der Recorder-Statistik (`change` für den Kalendertag) kommt.
+- Ist `entity_today` leer, sucht die Karte am Gerät des Leistungssensors **genau einen** Energiezähler (Einspeise-/Erzeugungszähler ausgenommen). Bei mehreren Kandidaten wird nichts geraten – dann `entity_today` setzen. Für PV mit mehreren Anlagen werden die Zähler summiert, wenn jede Anlage einen hat.
+- Netz und Akku: keine automatische Zuordnung. `entity_today` (Bezug bzw. Entladung) und optional `entity_today_secondary` (Einspeisung bzw. Ladung) werden als `2.1 / 18.9 kWh` angezeigt. Hausverbrauch: nur mit `entity_today`.
+- Aktualisierung alle 5 Minuten. Fehlt die Statistik oder ist sie nicht lesbar, steht `– kWh` (keine erfundene Null).
+- Im Linked-Modus per Karten-Override: `slots: [{id: grid, entity_today: sensor.netzbezug_heute, entity_today_secondary: sensor.einspeisung_heute}]`.
 
 ### Poolpumpe und Wärmepumpe
 
@@ -136,7 +150,7 @@ Aktuelle Einschränkungen: Die Live-Verknüpfung verwendet Dashboard-Pfad und Fl
 
 Beispiel: Die Flow Card liegt unter `/dashboard-energiemanager/s-f-c` (zweite Ansicht). Im Row-Card-Editor **Dashboard-Pfad: `dashboard-energiemanager`**, **Flow Card Nummer: `1`**, sofern es die erste Flow Card im gesamten Dashboard ist. `s-f-c` ist der Ansichtspfad und gehört nicht ins Feld.
 
-Seit 1.0.1 werden auch `views[].sections[].cards[]` (Sections-Dashboard) und verschachtelte Karten/Stacks durchsucht. Die Suche verwendet die gespeicherte Lovelace-Konfiguration des angegebenen Dashboards; wird die Flow Card nicht gefunden, nennt die Fehlermeldung jetzt den ausgewählten Dashboard-Pfad. Nach einem Update ggf. HA neu starten, Dashboard neu laden und die automatisch registrierte Ressource `/smartify_energy_row_card/smartify-energy-row-card.js?v=2.1.1` prüfen.
+Seit 1.0.1 werden auch `views[].sections[].cards[]` (Sections-Dashboard) und verschachtelte Karten/Stacks durchsucht. Die Suche verwendet die gespeicherte Lovelace-Konfiguration des angegebenen Dashboards; wird die Flow Card nicht gefunden, nennt die Fehlermeldung jetzt den ausgewählten Dashboard-Pfad. Nach einem Update ggf. HA neu starten, Dashboard neu laden und die automatisch registrierte Ressource `/smartify_energy_row_card/smartify-energy-row-card.js?v=2.2.0` prüfen.
 
 **Einheitliche technische Bezeichnung ab 2.0.0:** Domain `smartify_energy_row_card`, Kartentyp `custom:smartify-energy-row-card`, Ressource `/smartify_energy_row_card/smartify-energy-row-card.js`. GitHub-Repository-URL bleibt unverändert.
 

@@ -118,3 +118,9 @@ Dieses Dokument gilt für **jede** Änderung an Smartify Energy Row Card (SERC),
 - Die Kartendatei wird mit `StaticPathConfig(..., True)` (langlebiger Browser-Cache) ausgeliefert. Nur sicher, weil die Ressourcen-URL `?v=<VERSION>` trägt: jede veröffentlichte JS-Änderung braucht eine neue Manifest-Version.
 - Die Karte nicht über `add_extra_js_url` einbinden: Extra-JS im `<head>` kann vor dem Custom-Element-Polyfill des HA-Frontends laufen und erzeugt dann dauerhaft „Konfigurationsfehler“ (siehe smartify-energy-pro 0.3.62). Test in `tests/test_repository.py`.
 - `getGridOptions()` ist die aktuelle HA-API; `getLayoutOptions()` bleibt nur für ältere Versionen.
+
+## Tageswerte (2.2.0)
+- `show_today` ist standardmäßig `false`; ohne die Option darf die Karte keine Statistik-Abfragen senden und muss unverändert aussehen (Regressionstest).
+- Quelle ausschließlich `recorder/statistic_during_period` mit `calendar: {period: day}`, `types: [change]`, `units: {energy: kWh}`. Keine eigene Integration der Leistung im Browser.
+- Automatische Zuordnung nur bei **genau einem** Energiezähler am Gerät des Leistungssensors (Einspeise-/Erzeugungszähler ausgenommen); nie für Netz, Akku, Haus. Mehrdeutig = kein Wert. Explizites `entity_today` hat immer Vorrang.
+- Abfrage höchstens alle 5 Minuten bzw. bei geänderten Quellen; nicht im `hass`-Setter bei jeder Zustandsänderung. Fehlende Werte als `–`, nie 0.

@@ -3,7 +3,7 @@
  * Lovelace Custom Card — alle Energiewerte in einer Zeile.
  * Profile zentral via HA Websocket gespeichert (geräteübergreifend, kein Token nötig),
  * Abweichungen pro Karte in der Lovelace-Kartenkonfiguration.
- * Version: 2.1.1 (standalone integration)
+ * Version: 2.2.0 (standalone integration)
  *
  * Speicherung: eigener Home-Assistant-Store via authentifizierte WebSocket-Endpunkte
  *
@@ -140,6 +140,63 @@ function slotPower(hass,slot,measure){
   }
   return finitePower(hass,slot.entity);
 }
+// ── Tageswerte (Energie heute) ───────────────────────────────────────────────
+// Quelle: Recorder-Statistik „change“ für den Kalendertag. Funktioniert mit Tageszählern
+// (utility_meter, „Energie heute“) ebenso wie mit Gesamtzählern (total_increasing).
+const ENERGY_UNITS=new Set(["wh","kwh","mwh"]);
+const TODAY_REFRESH_MS=5*60*1000;
+const NO_AUTO_MODES=new Set(["home","grid","flow_grid","battery"]);
+const isEnergySensor=(hass,id)=>{
+  const st=hass?.states?.[id];if(!st||!String(id).startsWith("sensor."))return false;
+  const a=st.attributes||{};
+  return ["total_increasing","total"].includes(a.state_class)&&
+    (a.device_class==="energy"||ENERGY_UNITS.has(String(a.unit_of_measurement||"").toLowerCase()));
+};
+// Energiezähler zum Leistungssensor: genau ein passender Zähler am selben Gerät, sonst keiner (kein Raten).
+const AUTO_CACHE=new WeakMap();
+function autoEnergyEntity(hass,powerId){
+  const reg=hass?.entities;if(!reg||typeof reg!=="object")return null;
+  let cache=AUTO_CACHE.get(reg);if(!cache){cache=new Map();AUTO_CACHE.set(reg,cache);}
+  if(!cache.has(powerId))cache.set(powerId,findEnergyEntity(hass,powerId));
+  return cache.get(powerId);
+}
+function findEnergyEntity(hass,powerId){
+  const dev=hass?.entities?.[powerId]?.device_id;if(!dev)return null;
+  const found=Object.values(hass.entities).filter(e=>e&&e.device_id===dev&&e.entity_id!==powerId&&!e.hidden&&!e.disabled_by&&isEnergySensor(hass,e.entity_id))
+    .map(e=>e.entity_id).filter(id=>!/(export|einspeis|return|feed|produc|erzeug)/i.test(id+" "+(hass.states[id]?.attributes?.friendly_name||"")));
+  return found.length===1?found[0]:null;
+}
+// Liefert die Statistik-IDs je Slot: a = Tageswert, b = zweiter Tageswert (z. B. Einspeisung). null = keiner.
+function todayEntityIds(hass,slot){
+  const list=v=>typeof v==="string"&&v.trim()?[v.trim()]:null;
+  let a=list(slot.entity_today);
+  if(!a&&!NO_AUTO_MODES.has(slot.mode)){
+    const powers=Array.isArray(slot.entities)&&slot.entities.length?slot.entities:slot.entity?[slot.entity]:[];
+    const auto=powers.map(id=>autoEnergyEntity(hass,id));
+    if(auto.length&&auto.every(Boolean))a=[...new Set(auto)];
+  }
+  return {a,b:list(slot.entity_today_secondary)};
+}
+function formatEnergy(kwh){
+  if(kwh==null||!Number.isFinite(kwh))return "–";
+  const a=Math.abs(kwh);
+  return a>=100?String(Math.round(a)):a.toFixed(1);
+}
+async function fetchTodayKwh(hass,id){
+  try{
+    const r=await hass.callWS({type:"recorder/statistic_during_period",statistic_id:id,
+      calendar:{period:"day"},types:["change"],units:{energy:"kWh"}});
+    const v=Number(r?.change);return r&&r.change!=null&&Number.isFinite(v)?v:null;
+  }catch(_){return null;}
+}
+// Text im Slot: „12.4 kWh“, mit zweitem Wert „12.4 / 3.1 kWh“; nichts, wenn keine Quelle.
+function todayText(t){
+  if(!t||(t.a===undefined&&t.b===undefined))return "";
+  const parts=[t.a,t.b].filter(v=>v!==undefined).map(formatEnergy);
+  return parts.join(" / ")+" kWh";
+}
+const sumOrNull=vals=>vals.length&&vals.every(Number.isFinite)?vals.reduce((x,y)=>x+y,0):null;
+
 const esc=(v)=>String(v??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
 
 // ── Werteformat ──────────────────────────────────────────────────────────────
@@ -228,6 +285,7 @@ const DEFAULT_SETTINGS = {
   background_transparency: 0, allow_wrap: true,
   source_mode: "manual", flow_dashboard: "lovelace", flow_index: 1,
   hide_low_power_devices: false, device_display_threshold_w: 0,
+  show_today: false, today_icon_size: 16, font_size_today: 12,
 };
 const SETTING_KEYS = new Set(Object.keys(DEFAULT_SETTINGS));
 const PROFILE_NAME_RE = /^[a-z0-9_-]{1,40}$/;
@@ -529,6 +587,9 @@ const SETTING_FIELDS = [
   { key: "background_transparency", label: "Hintergrundtransparenz (0–100 %)", type: "range", min: 0, max: 100, step: 5 },
   { key: "slot_border", label: "Rahmen um Kacheln", type: "checkbox" },
   { key: "allow_wrap", label: "Zeilenumbruch auf schmalen Bildschirmen", type: "checkbox" },
+  { key: "show_today", label: "Tageswerte anzeigen (kWh heute, kleines Icon daneben)", type: "checkbox" },
+  { key: "today_icon_size", label: "Icon-Größe mit Tageswert (px)", type: "number", min: 10, max: 64 },
+  { key: "font_size_today", label: "Schriftgröße Tageswert", type: "number", min: 8, max: 32 },
   { key: "hide_low_power_devices", label: "Verbraucher mit geringer Leistung ausblenden", type: "checkbox" },
   { key: "device_display_threshold_w", label: "Ausblenden unter Leistung (W)", type: "number", min: 0, max: 100000 },
 ];
@@ -644,8 +705,9 @@ class SmartifyEnergyRowCardEditor extends HTMLElement {
     return Object.keys(this._hass.states).sort();
   }
 
-  _datalist(id) {
-    return `<datalist id="${id}">${this._entityList().map(e => `<option value="${esc(e)}">`).join("")}</datalist>`;
+  _datalist(id, energy = false) {
+    const list = energy ? this._entityList().filter(e => isEnergySensor(this._hass, e)) : this._entityList();
+    return `<datalist id="${id}">${list.map(e => `<option value="${esc(e)}">`).join("")}</datalist>`;
   }
 
   _effectiveSettings() {
@@ -716,6 +778,16 @@ class SmartifyEnergyRowCardEditor extends HTMLElement {
             <div><label>Farbe hoch ab (W)</label><input type="number" data-field="threshold_high" value="${levelThresholds(slot).high}"></div>
           </div>
         ` : ""}
+
+        <label>Tageswert: Energie-Sensor (kWh)${isGrid?" Netzbezug":""}</label>
+        ${this._datalist("sl-t1", true)}
+        <input list="sl-t1" type="text" data-field="entity_today" value="${esc(slot.entity_today || "")}" placeholder="leer = automatisch vom selben Gerät">
+        ${isGrid || slot.mode === "battery" ? `
+          <label>Tageswert 2: Energie-Sensor (kWh)${isGrid?" Einspeisung":" Ladung"}</label>
+          ${this._datalist("sl-t2", true)}
+          <input list="sl-t2" type="text" data-field="entity_today_secondary" value="${esc(slot.entity_today_secondary || "")}">
+        ` : ""}
+        <div class="hint">Nur sichtbar mit „Tageswerte anzeigen“. Tageszähler oder Gesamtzähler, der Wert ab Mitternacht kommt aus der HA-Statistik.</div>
 
         <label>Ausblenden unterhalb (W)</label>
         <input type="number" data-field="hide_below" value="${slot.hide_below ?? 0}">
@@ -1020,6 +1092,7 @@ class SmartifyEnergyRowCard extends HTMLElement {
 
   setConfig(config) {
     this._config = { ...(config || {}) };
+    this._todayKey = "";
     this._flowFetched = 0;
     this._flowGeneration++;
     this._flowConfig = null;
@@ -1050,6 +1123,29 @@ class SmartifyEnergyRowCard extends HTMLElement {
     } else if (this._needsRender(hass)) {
       this._render();
     }
+    this._maybeLoadToday();
+  }
+
+  // Tageswerte per Recorder-Statistik laden: beim ersten Mal, bei geänderten Quellen und alle 5 min.
+  _maybeLoadToday(force = false) {
+    const h = this._hass;
+    if (!h?.callWS || this._todayLoading || !this._settings.show_today || !this._lastSlots) return;
+    const plan = this._lastSlots.map(s => ({ id: s.id, ...todayEntityIds(h, s) }));
+    const key = JSON.stringify(plan);
+    if (!force && key === this._todayKey && Date.now() - this._todayAt < TODAY_REFRESH_MS) return;
+    this._todayKey = key;
+    this._todayAt = Date.now();
+    this._todayLoading = true;
+    const ids = [...new Set(plan.flatMap(p => [...(p.a || []), ...(p.b || [])]))];
+    Promise.all(ids.map(id => fetchTodayKwh(h, id).then(v => [id, v]))).then(pairs => {
+      const val = Object.fromEntries(pairs);
+      const out = {};
+      for (const p of plan) out[p.id] = {
+        a: p.a ? sumOrNull(p.a.map(id => val[id])) : undefined,
+        b: p.b ? sumOrNull(p.b.map(id => val[id])) : undefined,
+      };
+      this._today = out;
+    }).finally(() => { this._todayLoading = false; this._render(); });
   }
 
   // Home Assistant ruft den hass-Setter bei JEDER Zustandsänderung im System auf.
@@ -1142,6 +1238,9 @@ class SmartifyEnergyRowCard extends HTMLElement {
     const vars     = slotStyleVars(c);
     const barPos   = vars.barHeight > 0 ? c.bar_position : "none";
     const slotText = c.text_color === "slot";
+    const showToday = c.show_today === true;
+    const todayIcon = clampNum(c.today_icon_size, 10, 64, 16);
+    const fsToday   = clampNum(c.font_size_today, 8, 32, 12);
 
     const linked=c.source_mode==="linked";
     const dataSlots=linked
@@ -1149,6 +1248,7 @@ class SmartifyEnergyRowCard extends HTMLElement {
       :resolved.slots;
     const measurements=dataSlots.some(slot=>["pv","home","flow_grid","battery"].includes(slot.mode))
       ?flowMeasurements(h,dataSlots):null;
+    this._lastSlots=dataSlots;
     const sigIds=slotEntityIds(dataSlots);
     this._sig={ids:sigIds,states:sigIds.map(id=>h?.states?.[id]),linked,entities:h?.entities,labels:h?.labels};
     const visible=dataSlots.filter(s=>isVisibleWithThreshold(h,s,measurements,c));
@@ -1163,14 +1263,19 @@ class SmartifyEnergyRowCard extends HTMLElement {
       const flip    = (slot.mode === "grid" || slot.mode==="flow_grid") && slotPower(h,slot,measurements)>0
                       ? "scaleX(-1)" : "scaleX(1)";
       const color   = slotText ? safeAccent(slot.color_text, "var(--primary-text-color)") : "var(--primary-text-color)";
+      const today   = showToday ? todayText(this._today?.[slot.id]) : "";
+      const iSize   = showToday ? todayIcon : iconSize;
       return `
         <div class="slot" data-id="${esc(slot.id)}"
              style="--row-gradient:${bg};--row-bar:${bar};--row-text:${color};height:${height}px;">
           ${barPos!=="none"?`<div class="bar ${barPos}"></div>`:""}
-          <div class="icon-wrap">
-            <ha-icon icon="${esc(slot.icon)}"
-              style="color:${iconOff?"transparent":"currentColor"};transform:${flip};--mdc-icon-size:${iconSize}px;width:${iconSize}px;height:${iconSize}px"></ha-icon>
-            ${overlay}
+          <div class="top">
+            <div class="icon-wrap">
+              <ha-icon icon="${esc(slot.icon)}"
+                style="color:${iconOff?"transparent":"currentColor"};transform:${flip};--mdc-icon-size:${iSize}px;width:${iSize}px;height:${iSize}px"></ha-icon>
+              ${overlay}
+            </div>
+            ${today ? `<span class="today" style="font-size:${fsToday}px">${esc(today)}</span>` : ""}
           </div>
           <div class="value" style="font-size:${fsValue}px"><span class="num">${esc(parts.num)}</span>${parts.unit?`<span class="unit">&nbsp;${esc(parts.unit)}</span>`:""}${parts.dir?`<span class="unit dir"> · ${esc(parts.dir)}</span>`:""}</div>
           ${slot.show_name ? `<div class="name" style="font-size:${fsName}px">${esc(slot.label)}</div>` : ""}
@@ -1203,6 +1308,8 @@ class SmartifyEnergyRowCard extends HTMLElement {
         .bar { position:absolute; left:0; right:0; height:${vars.barHeight}px; background:var(--row-bar); pointer-events:none; }
         .bar.top { top:0; } .bar.bottom { bottom:0; }
         ha-icon { display:block; }
+        .top { display:flex; align-items:center; justify-content:center; gap:4px; max-width:100%; padding:0 3px; box-sizing:border-box; }
+        .today { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.85; }
         .icon-wrap { position:relative; display:flex; align-items:center; justify-content:center; }
         .overlay { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
                    pointer-events:none; display:flex; overflow:hidden;
