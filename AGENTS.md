@@ -59,6 +59,8 @@ Dieses Dokument gilt für **jede** Änderung an Smartify Energy Row Card (SERC),
 
 ## 6. Test- und Release-Gates (verpflichtend)
 
+**Vor JEDEM Push (auch Folge-Commits im PR): `bash scripts/precheck.sh` muss grün sein.** Es führt die Gates 1–3 genau wie die CI aus (in UTC). Nicht pushen, um „zu sehen, was die CI sagt“. Mehrere Dateien in **einem** Commit pushen, nicht Datei für Datei über die API (jeder Commit startet einen CI-Lauf und bricht den vorherigen ab).
+
 **Vor jeder Zusammenführung oder Veröffentlichung:**
 1. `node --check custom_components/smartify_energy_row_card/frontend/smartify-energy-row-card.js`.
 2. `node --test tests/*.test.cjs`: mindestens PV-Mehranlagen, W/kW/MW, Netzsaldo +/- und invertierte Richtung, getrennte Netzsensoren, Akku-Vorzeichen, fehlende Werte, Label/Deduplizierung, Import-Persistenz, Dashboard-Link-Auswahl und Fehler, HTML-Escaping, Registrierungen.
